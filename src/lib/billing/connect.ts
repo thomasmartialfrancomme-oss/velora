@@ -190,8 +190,14 @@ async function findProductByName(name: string, secret: string): Promise<string> 
 
 async function findPortalConfiguration(secret: string, name: string): Promise<string> {
   try {
-    const list = await stripeRequest<{ data?: { id: string; name?: string }[] }>('/v1/billing_portal/configurations', { secret, method: 'GET', query: { limit: 25 } });
-    return (list.data ?? []).find((configuration) => configuration.name === name)?.id ?? '';
+    const list = await stripeRequest<{ data?: { id: string; name?: string; active?: boolean; is_default?: boolean }[] }>(
+      '/v1/billing_portal/configurations',
+      { secret, method: 'GET', query: { limit: 25 } },
+    );
+    // Une configuration désactivée porte encore le même nom : la réutiliser telle quelle ferait
+    // pointer le lien « Gérer mon abonnement » vers un portail que Stripe refuse d'ouvrir.
+    const sameName = (list.data ?? []).filter((configuration) => configuration.name === name && configuration.active !== false);
+    return (sameName.find((configuration) => configuration.is_default) ?? sameName[0])?.id ?? '';
   } catch (error) {
     if (error instanceof StripeError && (error.status === 404 || error.status === 400)) return '';
     throw error;
@@ -221,11 +227,26 @@ export async function connectStripeAccount(options: ConnectOptions): Promise<Con
   const currency = (options.currency ?? 'eur').toLowerCase();
   const webhookUrl = options.webhookUrl ?? `${env.appUrl.replace(/\/$/, '')}/api/billing/webhook`;
 
+  const warnings: string[] = [];
   const account = await stripeRequest<StripeAccount>('/v1/account', { secret, method: 'GET' });
   if (!account.id) throw new StripeError(502, 'bad_account', 'Stripe answered without naming an account, so nothing was changed.');
 
-  const isApproved = (rail: { capability: string[] }) =>
-    rail.capability.some((name) => account.capabilities?.[name]?.status === 'active');
+  // Les capacites ne sont PAS dans la reponse de `GET /v1/account` : ce sont des objets lies,
+  // qu'on lit a leur propre endpoint. Croire le contraire rendait tous les rails « non
+  // approuves » sur un compte reelslement actif en carte bancaire — mesure en production, ou la
+  // connexion repondait `railsApproved: []` alors que `card_payments` y etait bien active.
+  let live: Record<string, string> = {};
+  try {
+    const caps = await stripeRequest<{ data?: { id: string; status: string }[] }>('/v1/account/capabilities', { secret, method: 'GET' });
+    for (const capability of caps.data ?? []) live[capability.id] = capability.status;
+  } catch (error) {
+    if (!(error instanceof StripeError)) throw error;
+    for (const [name, value] of Object.entries((account.capabilities ?? {}) as Record<string, { status?: string }>)) {
+      if (value && typeof value === 'object' && value.status) live[name] = value.status;
+    }
+    warnings.push(`Stripe a refusé la lecture des capacités (${error.message}) ; les moyens de paiement viennent de la configuration, pas du compte.`);
+  }
+  const isApproved = (rail: { capability: string[] }) => rail.capability.some((name) => live[name] === 'active');
   const approved = RAILS.filter(isApproved).map((rail) => rail.id);
   const notApproved = RAILS.filter((rail) => !approved.includes(rail.id)).map((rail) => rail.id);
   const paymentMethods = (options.paymentMethods ?? (approved.length ? approved.join(',') : 'card')).trim();
@@ -315,7 +336,6 @@ export async function connectStripeAccount(options: ConnectOptions): Promise<Con
   }
 
   /* the webhook: only a freshly created endpoint reveals its signing secret */
-  const warnings: string[] = [];
   const foundEndpoint = await findWebhookEndpoint(secret, webhookUrl);
   /** A secret we already hold — from a previous connection, or from the environment —
    *  is a reason not to touch the endpoint at all. Reconnecting must not accumulate

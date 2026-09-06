@@ -223,22 +223,29 @@ const mock = http.createServer((request, response) => {
         id: 'acct_check_1', object: 'account', country: 'FR',
         charges_enabled: true, details_submitted: true,
         business_profile: { name: 'Velora Test SARL' },
-        // Les noms sont ceux que Stripe renvoie réellement (vérifiés sur un compte français :
-        // `card_payments`, pas `card`). Un fixture qui reprend mes hypothèses ne teste rien.
-        capabilities: {
-          card_payments: { status: 'active' },
-          sepa_debit_payments: { status: 'active' },
-          bancontact_payments: { status: 'active' },
-          transfers: { status: 'inactive' },
-          bank_transfer_payments: { status: 'inactive' },
-          ideal_payments: { status: 'pending' },
-        },
+        // Réponse réelle de `GET /v1/account` : SANS capacités. Elles vivent à leur propre
+        // endpoint, et un fixture qui les place ici est précisément ce qui m'a fait publier un
+        // lecteur qui ne trouvait jamais rien sur un compte réel.
+        capabilities: undefined,
       });
     }
     // GET /v1/prices — la liste, seuls filtres documentés. Stripe refuse tout paramètre
     // inconnu ici comme sur « retrieve », donc le harnais fait de même : un code qui envoie
     // lookup_key (au lieu de lookup_keys[0]) doit échouer ici comme il échoue en production.
     const LIST_PRICE_PARAMS = ['active', 'currency', 'product', 'type', 'created', 'ending_before', 'limit', 'recurring', 'starting_after'];
+    if (request.method === 'GET' && url.pathname === '/v1/account/capabilities') {
+      const CAPS = [
+        ['card_payments', 'active'],
+        ['sepa_debit_payments', 'active'],
+        ['bancontact_payments', 'active'],
+        ['transfers', 'inactive'],
+        ['bank_transfer_payments', 'inactive'],
+        ['ideal_payments', 'pending'],
+        ['us_bank_account_ach_payments', 'unrequested'],
+        ['bacs_debit_payments', 'unrequested'],
+      ];
+      return reply(response, 200, { object: 'list', url: '/v1/account/capabilities', has_more: false, data: CAPS.map(([id, status]) => ({ id, object: 'capability', status })) });
+    }
     if (request.method === 'GET' && url.pathname === '/v1/prices') {
       const requestedKeys = [...url.searchParams.entries()].filter(([k]) => /^lookup_keys\[\d+\]$/.test(k)).map(([, v]) => v);
       if (MOCK.legacyLookup?.size && requestedKeys.some((k) => MOCK.legacyLookup.has(k))) {
@@ -285,7 +292,10 @@ const mock = http.createServer((request, response) => {
       return reply(response, 200, { object: 'list', data: [...MOCK.products].map(([name, id]) => ({ id, name })) });
     }
     if (request.method === 'GET' && url.pathname === '/v1/billing_portal/configurations') {
-      return reply(response, 200, { object: 'list', data: [...MOCK.portal].map(([name, id]) => ({ id, name })) });
+      // Un doublon volontairement hors service, avec le même nom : une implémentation qui prend
+      // le premier résultat renverrait bpc_stale et le lien du membre serait mort.
+      const stale = MOCK.portal.size ? [{ id: 'bpc_stale', name: 'VELORA membership', active: false }] : [];
+      return reply(response, 200, { object: 'list', data: [...stale, ...[...MOCK.portal].map(([name, id]) => ({ id, name, active: true, is_default: true }))] });
     }
     if (request.method === 'GET' && url.pathname === '/v1/webhook_endpoints') {
       return reply(response, 200, { object: 'list', data: MOCK.endpoints.map(({ id, url: endpointUrl, status }) => ({ id, url: endpointUrl, status })) });
@@ -610,7 +620,8 @@ try {
   check('le portail client est créé', Boolean(outcome?.portalCreated), JSON.stringify(outcome?.portalConfigurationId ?? outcome?.portalCreated));
   const portalCall = [...REQUESTS].reverse().find((entry) => entry.path === '/v1/billing_portal/configurations' && entry.method === 'POST');
   const pf = portalCall?.params?.features ?? {};
-  check('la configuration du portail ne contient aucun champ que Stripe ne connaît pas', portalCall?.params?.return_urls === undefined && portalCall?.params?.business_profile?.url === undefined && pf.subscription_update?.after_completion === undefined && pf.subscription_update?.default_payment_method === undefined, JSON.stringify({ bp: Object.keys(portalCall?.params?.business_profile ?? {}), su: Object.keys(pf.subscription_update ?? {}) }));
+  check('le portail réutilisé n’est pas une configuration hors service', String(outcome?.portalConfigurationId) !== 'bpc_stale', String(outcome?.portalConfigurationId));
+    check('la configuration du portail ne contient aucun champ que Stripe ne connaît pas', portalCall?.params?.return_urls === undefined && portalCall?.params?.business_profile?.url === undefined && pf.subscription_update?.after_completion === undefined && pf.subscription_update?.default_payment_method === undefined, JSON.stringify({ bp: Object.keys(portalCall?.params?.business_profile ?? {}), su: Object.keys(pf.subscription_update ?? {}) }));
   const on = (v) => v === true || v === 'true';
   check('le portail laisse changer de carte, voir ses factures, annuler à l’échéance', on(pf.invoice_history?.enabled) && on(pf.payment_method_update?.enabled) && on(pf.subscription_cancel?.enabled) && pf.subscription_cancel?.mode === 'at_period_end', JSON.stringify(pf));
 
@@ -618,6 +629,7 @@ try {
   const live = afterConnect.integrations.billing;
   check('l’application facture désormais chez Stripe', live.provider === 'stripe' && live.mode === 'test' && live.source === 'admin', JSON.stringify({ p: live.provider, m: live.mode, s: live.source }));
   check('les rails suivent ce que le compte a obtenu', /Card/.test(live.methodsSummary) && /SEPA/.test(live.methodsSummary) && !/ransfer/.test(live.methodsSummary), live.methodsSummary);
+  check('les capacités sont lues à leur propre endpoint', REQUESTS.some((entry) => entry.method === 'GET' && entry.path === '/v1/account/capabilities'), 'GET /v1/account/capabilities jamais émis');
   check('la carte est reconnue par card_payments, pas par un nom inventé', /Card/.test(live.methodsSummary) && /Bancontact/.test(live.methodsSummary), live.methodsSummary);
   check('le virement est retiré de la vente, pas cassé', live.transferAvailable === false && live.monthlyAvailable === true, JSON.stringify({ t: live.transferAvailable, m: live.monthlyAvailable }));
   check('les prix stockés rendent les trois plans vendables', live.pricesComplete === true && live.pricesConfigured === 6, JSON.stringify({ c: live.pricesConfigured, ok: live.pricesComplete }));
