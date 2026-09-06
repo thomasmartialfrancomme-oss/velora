@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Cormorant_Garamond, Manrope } from 'next/font/google';
 import { ToastProvider } from '@/components/ui/toast';
+import { I18nProvider } from '@/lib/i18n/context';
+import { getT, localeMeta, localeTable } from '@/lib/i18n/server';
 import './globals.css';
 
 const display = Cormorant_Garamond({
@@ -57,17 +59,27 @@ export const viewport: Viewport = {
   colorScheme: 'dark',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The language is resolved once, here, for the whole tree: the document gets the
+  // right `lang` (screen readers and translation prompts depend on it), the server
+  // chrome reads its table from the same request, and the interactive parts
+  // receive it through context — one source of truth per render.
+  const { locale, htmlLang, dir } = localeMeta();
+  const T = getT(locale);
   return (
-    <html lang="en-GB" className={`${display.variable} ${sans.variable}`}>
+    <html lang={htmlLang} dir={dir} className={`${display.variable} ${sans.variable}`}>
       <body className="grain bg-ink-1000 font-sans text-ivory-100 antialiased">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-6 focus:top-6 focus:z-[90] focus:rounded-[3px] focus:border focus:border-gold-400/50 focus:bg-ink-900 focus:px-4 focus:py-2 focus:text-[11px] focus:uppercase focus:tracking-[0.2em] focus:text-ivory-50"
         >
-          Skip to content
+          {T('Skip to content')}
         </a>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <I18nProvider locale={locale} table={localeTable(locale)}>
+            {children}
+          </I18nProvider>
+        </ToastProvider>
       </body>
     </html>
   );

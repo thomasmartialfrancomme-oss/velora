@@ -36,6 +36,7 @@ const PUBLIC_API = [
   '/api/auth/forgot-password',
   '/api/auth/logout',
   '/api/access-requests',
+  '/api/locale',
   '/api/health',
   '/api/billing/webhook',
 ];

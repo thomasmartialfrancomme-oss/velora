@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';;
 
 export interface Column<T> {
   key: string;
@@ -43,10 +44,11 @@ export function DataTable<T extends { id: string }>({
   footer?: React.ReactNode;
   id?: string;
 }) {
+  const T = getT();
   if (!rows.length) {
     return (
       <div className="rounded-[6px] border border-dashed border-ivory-200/[0.1] px-6 py-14 text-center">
-        {empty ?? <p className="text-[13px] text-graphite-400">Nothing recorded yet.</p>}
+        {empty ?? <p className="text-[13px] text-graphite-400">{T('Nothing recorded yet.')}</p>}
       </div>
     );
   }
@@ -67,7 +69,7 @@ export function DataTable<T extends { id: string }>({
                   column.hideBelow && HIDE[column.hideBelow],
                 )}
               >
-                {column.header}
+                {T(column.header)}
               </th>
             ))}
           </tr>

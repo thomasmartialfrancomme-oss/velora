@@ -13,6 +13,7 @@ import { cache } from 'react';
 import { getDb, audit, nowIso } from '@/lib/db';
 import { SESSION_COOKIE, signSessionToken, verifySessionToken, type Role, type SessionClaims } from '@/lib/auth/token';
 import { hashPassword } from '@/lib/auth/password';
+import { fromBcp47, LOCALE_COOKIE } from '@/lib/i18n/locales';
 
 export const APP_PATHS = {
   login: '/login',
@@ -53,7 +54,7 @@ const cookieOptions = () => ({
 export async function createSession(userId: string): Promise<void> {
   const db = getDb();
   const user = db.get<Record<string, string>>(
-    'SELECT id, email, role, status, sessions_revoked_at FROM users WHERE id = @id',
+    'SELECT id, email, role, status, locale, sessions_revoked_at FROM users WHERE id = @id',
     { id: userId },
   );
   if (!user) throw new Error('Cannot open a session for an unknown account.');
@@ -61,6 +62,12 @@ export async function createSession(userId: string): Promise<void> {
 
   const claims = await signSessionToken({ sub: user.id, email: user.email, role: user.role as Role });
   cookies().set(SESSION_COOKIE, claims, cookieOptions());
+  // The interface language the member chose in their profile is mirrored into the
+  // request cookie, so signing in from a new device opens the product in their
+  // language instead of the browser default. A visitor who changed the language
+  // from the marketing site keeps that choice until they sign in.
+  const uiLocale = fromBcp47(user.locale);
+  if (uiLocale) cookies().set(LOCALE_COOKIE, uiLocale, { ...cookieOptions(), httpOnly: true, maxAge: 60 * 60 * 24 * 365 });
   db.run('UPDATE users SET last_login_at = @now, updated_at = @now WHERE id = @id', {
     now: nowIso(),
     id: userId,

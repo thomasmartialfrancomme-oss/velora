@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';;
 
 /** Nothing in the product is ever allowed to render as a blank rectangle. */
 export function EmptyState({
@@ -16,6 +17,7 @@ export function EmptyState({
   className?: string;
   compact?: boolean;
 }) {
+  const T = getT();
   return (
     <div
       className={cn(
@@ -25,18 +27,19 @@ export function EmptyState({
       )}
     >
       {icon ? <div className="mb-4 text-graphite-400">{icon}</div> : null}
-      <p className="font-serif text-[1.1rem] text-ivory-100">{title}</p>
-      {description ? <p className="mt-2 max-w-md text-[13px] leading-relaxed text-graphite-300">{description}</p> : null}
+      <p className="font-serif text-[1.1rem] text-ivory-100">{T(title)}</p>
+      {description ? <p className="mt-2 max-w-md text-[13px] leading-relaxed text-graphite-300">{T(description)}</p> : null}
       {action ? <div className="mt-5 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
     </div>
   );
 }
 
 export function ErrorState({ title = 'That could not be loaded.', description, retry }: { title?: string; description?: string; retry?: React.ReactNode }) {
+  const T = getT();
   return (
     <div className="rounded-[5px] border border-state-risk/25 bg-state-risk/[0.04] px-6 py-8 text-center">
-      <p className="font-serif text-[1.1rem] text-ivory-100">{title}</p>
-      {description ? <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-graphite-300">{description}</p> : null}
+      <p className="font-serif text-[1.1rem] text-ivory-100">{T(title)}</p>
+      {description ? <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-graphite-300">{T(description)}</p> : null}
       {retry ? <div className="mt-5 flex justify-center">{retry}</div> : null}
     </div>
   );

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';;
 
 export type Tone = 'neutral' | 'ok' | 'info' | 'attention' | 'risk' | 'gold';
 
@@ -12,6 +13,36 @@ const TONES: Record<Tone, string> = {
 };
 
 export function Badge({
+  children,
+  tone = 'neutral',
+  className,
+  dot,
+}: {
+  children: React.ReactNode;
+  tone?: Tone;
+  className?: string;
+  dot?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-2 rounded-full border px-2.5 py-[3px] text-[10px] uppercase tracking-[0.18em] leading-none whitespace-nowrap',
+        TONES[tone],
+        className,
+      )}
+    >
+      {dot ? <span className="h-1 w-1 rounded-full bg-current" /> : null}
+      {typeof children === 'string' ? getT()(children) : children}
+    </span>
+  );
+}
+
+/**
+ * Same markup, no lookup: for the rare badge rendered inside a client component,
+ * where the request's language is not reachable and the text is data (a
+ * residence state in the marketing showcase) rather than an interface label.
+ */
+export function RawBadge({
   children,
   tone = 'neutral',
   className,

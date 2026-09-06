@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';;
 
 /**
  * The chrome shared by every screen inside the member area: a quiet header,
@@ -20,12 +21,16 @@ export function PageHeader({
   meta?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
+  // Every heading in the member area arrives through this component, so the
+  // language is applied once here instead of in seventeen pages that would drift.
+  // Props that are not plain strings are left exactly as they were given.
+  const T = getT();
   return (
     <header className="flex flex-col gap-7 border-b border-ivory-200/[0.07] pb-8 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0">
-        {eyebrow ? <p className="label mb-4 text-gold-300/80">{eyebrow}</p> : null}
-        <h1 className="font-serif text-[clamp(1.85rem,3.4vw,2.65rem)] font-light uppercase leading-[1.08] tracking-[0.04em] text-ivory-50">{title}</h1>
-        {lede ? <p className="mt-4 max-w-2xl text-[13.5px] leading-relaxed text-graphite-400">{lede}</p> : null}
+        {eyebrow ? <p className="label mb-4 text-gold-300/80">{T(eyebrow)}</p> : null}
+        <h1 className="font-serif text-[clamp(1.85rem,3.4vw,2.65rem)] font-light uppercase leading-[1.08] tracking-[0.04em] text-ivory-50">{T(title)}</h1>
+        {lede ? <p className="mt-4 max-w-2xl text-[13.5px] leading-relaxed text-graphite-400">{T(lede)}</p> : null}
         {meta ? <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] uppercase tracking-[0.18em] text-graphite-500">{meta}</div> : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2.5">{actions}</div> : null}
@@ -40,6 +45,7 @@ export function StatStrip({
   items: { label: string; value: React.ReactNode; detail?: string; href?: string; tone?: 'default' | 'gold' | 'attention' | 'ok' }[];
   className?: string;
 }) {
+  const T = getT();
   return (
     <div
       className={cn(
@@ -50,7 +56,7 @@ export function StatStrip({
       {items.map((item) => {
         const body = (
           <>
-            <p className="label text-graphite-500">{item.label}</p>
+            <p className="label text-graphite-500">{T(item.label)}</p>
             <p
               className={cn(
                 'mt-3 font-serif text-[1.75rem] font-light leading-none tabular-nums',
@@ -59,7 +65,7 @@ export function StatStrip({
             >
               {item.value}
             </p>
-            {item.detail ? <p className="mt-2.5 text-[11.5px] leading-relaxed text-graphite-500">{item.detail}</p> : null}
+            {item.detail ? <p className="mt-2.5 text-[11.5px] leading-relaxed text-graphite-500">{T(item.detail)}</p> : null}
           </>
         );
         return item.href ? (
@@ -77,11 +83,12 @@ export function StatStrip({
 }
 
 export function KeyValue({ items, className }: { items: { label: string; value: React.ReactNode }[]; className?: string }) {
+  const T = getT();
   return (
     <dl className={cn('divide-y divide-ivory-200/[0.06]', className)}>
       {items.map((item) => (
         <div key={item.label} className="flex items-baseline justify-between gap-6 py-2.5">
-          <dt className="text-[11.5px] uppercase tracking-[0.14em] text-graphite-500">{item.label}</dt>
+          <dt className="text-[11.5px] uppercase tracking-[0.14em] text-graphite-500">{T(item.label)}</dt>
           <dd className="min-w-0 text-right text-[13px] text-ivory-100">{item.value}</dd>
         </div>
       ))}
@@ -108,6 +115,8 @@ export function Notice({
     risk: 'border-state-risk/35 bg-state-risk/[0.06] text-ivory-100',
   }[tone];
 
+  const T = getT();
+
   const dot = {
     info: 'bg-graphite-400',
     attention: 'bg-gold-400',
@@ -120,7 +129,7 @@ export function Notice({
       <p className="flex items-start gap-3 text-[13px] leading-relaxed">
         <span className={cn('mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full', dot)} />
         <span className="min-w-0">
-          <span className="text-ivory-50">{title}</span>
+          <span className="text-ivory-50">{T(title)}</span>
           {children ? <span className="mt-1.5 block text-[12.5px] leading-relaxed text-graphite-400">{children}</span> : null}
         </span>
       </p>

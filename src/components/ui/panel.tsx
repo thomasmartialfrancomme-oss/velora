@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';;
 
 export function Panel({
   children,
@@ -40,12 +41,13 @@ export function PanelHeader({
   actions?: React.ReactNode;
   className?: string;
 }) {
+  const T = getT();
   return (
     <div className={cn('flex flex-wrap items-start justify-between gap-4', className)}>
       <div className="min-w-0">
-        {label ? <p className="label mb-2">{label}</p> : null}
-        <h2 className="font-serif text-[1.35rem] leading-tight text-ivory-100">{title}</h2>
-        {description ? <p className="mt-1.5 max-w-xl text-[13.5px] leading-relaxed text-graphite-300">{description}</p> : null}
+        {label ? <p className="label mb-2">{T(label)}</p> : null}
+        <h2 className="font-serif text-[1.35rem] leading-tight text-ivory-100">{typeof title === 'string' ? T(title) : title}</h2>
+        {description ? <p className="mt-1.5 max-w-xl text-[13.5px] leading-relaxed text-graphite-300">{typeof description === 'string' ? T(description) : description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
     </div>
@@ -53,7 +55,8 @@ export function PanelHeader({
 }
 
 export function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={cn('label', className)}>{children}</p>;
+  const label = typeof children === 'string' ? getT()(children) : children;
+  return <p className={cn('label', className)}>{label}</p>;
 }
 
 export function Divider({ className }: { className?: string }) {

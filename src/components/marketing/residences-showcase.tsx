@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 import { Section } from '@/components/marketing/section';
-import { Badge, StatusDot } from '@/components/ui/badge';
+import { RawBadge as Badge, StatusDot } from '@/components/ui/badge';
 import { cn, formatMoney } from '@/lib/utils/format';
 
 /**
