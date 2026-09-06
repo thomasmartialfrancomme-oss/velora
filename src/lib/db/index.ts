@@ -13,8 +13,6 @@ import crypto from 'node:crypto';
 import type BetterSqlite3 from 'better-sqlite3';
 import { applySchema, seed } from '@db/seed-core.mjs';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export type SqlParam = string | number | bigint | Buffer | null;
 export type SqlParams = Record<string, unknown> | unknown[];
 
@@ -62,7 +60,6 @@ export function getDb(): DatabaseHandle {
 
   // Required at runtime rather than at type time: better-sqlite3 is a native
   // module and must stay out of the bundler.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const Database = require('better-sqlite3');
   const raw: BetterSqlite3.Database = new Database(dbPath, { fileMustExist: false });
 

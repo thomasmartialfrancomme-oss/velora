@@ -77,7 +77,7 @@ Fixed-window, in-process counters (`src/lib/http/security.ts`) — adequate for 
 
 Shipped on every response (`next.config.mjs`): `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `poweredByHeader: false`, and `no-store` on all API responses. Source maps are not published.
 
-**Deliberately absent in this profile:** `Content-Security-Policy` and `X-Frame-Options`. The build is configured to be embeddable in preview and operations tooling, which requires allowing frames and relaxing script sources. For a real deployment, paste this into `next.config.mjs` and treat it as the baseline:
+**Applied when `NODE_ENV=production`** (which is why a `next start` build behaves differently from `npm run dev`): `Content-Security-Policy`, `X-Frame-Options: DENY` and `Strict-Transport-Security`. Development and preview profiles omit those three so the app remains embeddable in preview and operations tooling — that is a local convenience, not the deployment profile. `VELORA_ALLOW_FRAMING=1` removes the frame restriction on a production host (internal dashboards only; never on a public origin, where clickjacking against a sign-in or a payment screen is the whole point of the header). The exact values, also usable verbatim at your proxy if you would rather set them there:
 
 ```js
 { key: 'Content-Security-Policy', value:
@@ -132,9 +132,9 @@ Never: passwords or hashes, session material, cookies, document contents, IP add
 
 ## 13. Operator checklist before going live
 
-1. `AUTH_SECRET` set (32+ chars, from a secret manager, rotated on suspicion).
+1. `AUTH_SECRET` set (32+ chars, from a secret manager, rotated on suspicion). The process refuses to start without it — the check runs in `src/instrumentation.ts`, so an empty secret is a boot failure, not a quiet downgrade.
 2. TLS terminated at the proxy; HSTS enabled; `NEXT_PUBLIC_APP_URL` matching the real origin (it is used for callbacks and links).
-3. Paste the § 8 header block into `next.config.mjs`, then `npm run build && npm start`.
+3. `npm run build && NODE_ENV=production npm start`, then `curl -I https://your.host/` and confirm the § 8 set is actually on the response (CSP, `X-Frame-Options: DENY`, HSTS) — the configuration emits it, so a missing header means `NODE_ENV` is not production.
 4. `SMTP_URL` configured; confirm reset links no longer appear in logs.
 5. Stripe keys + webhook endpoint with its signing secret.
 6. Delete the demo households (`admin@velora.private` and both demo principals) once real accounts exist — `npm run db:users`, then the console or `sql --write`.

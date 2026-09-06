@@ -30,7 +30,8 @@ Change these in `db/demo-data.mjs` (`DEMO_CREDENTIALS`). They exist only so a de
 | [What is not switched on](#what-is-not-switched-on-and-exactly-what-would-turn-it-on) | [Architecture](#architecture) |
 | [Privacy model](#privacy-model) | [AI layer](#the-ai-layer) |
 | [Membership & billing](#membership-and-billing) | [Database CLI](#database-cli) |
-| [Launching it](#launching-it) | [First administrator](#the-first-administrator-account) |
+| [Launching it](#launching-it) | [Deploying on Render](#deploying-on-render) |
+| [First administrator](#the-first-administrator-account) | [Repository hygiene](#repository-hygiene) |
 
 ---
 
@@ -66,13 +67,17 @@ Three commands, all run against this repository:
 
 ```bash
 npm run typecheck   # tsc --noEmit, strict mode — clean
+npm run lint        # next lint with eslint-config-next — no errors
+npm run build       # production build — 28 pages, 47 API routes, middleware
 npm run db:verify   # schema, integrity, foreign keys, bcrypt digests, tenant columns, isolation
 npm run smoke       # 48 checks over HTTP: every page, key reads, upload→download→delete, privacy, guards
 ```
 
 `npm run smoke` (`scripts/smoke.mjs`, no test framework, plain Node) is the one that matters for a product like this, because it asserts the things a demo breaks first: no page renders an error boundary; two unrelated accounts see disjoint rows; reading another member's record by id returns 404; a state change without an `Origin` header returns 403; a principal calling an admin endpoint returns 403; an anonymous visitor to `/dashboard` is redirected to `/login?next=…`; the coordinator answers; a task and a document each round-trip (create → read → delete, including a PDF whose name contains an em dash, which is how a naive `Content-Disposition` first fails in production). It leaves exactly one artefact behind on purpose: the AI conversation it asks for, so `/ai` has something real to read.
 
-Last run against this tree: **typecheck clean · `db:verify` every check passed · smoke 48/48.**
+Last run against this tree: **typecheck clean · lint 0 errors · `npm run build` succeeded · `db:verify` every check passed · smoke 48/48** — and the smoke suite was run against the *built* application served by `npm start` with `NODE_ENV=production`, not only against the dev server, which is the difference between "works on my machine" and a claim.
+
+Two things that pass in development and fail in production were found by exactly that run, and both are fixed: a chart component was being handed a closure, which React refuses to serialise across the server→client boundary — `/finance` came back as a 200 with an empty shell and the smoke suite went to 47/48 (it checks for body copy, not just status codes); the residence page passed the same shape of prop to `BarChart` and was converted in the same change; and `next build` aborted on a literal `await import('stripe')`, since the SDK is intentionally not a dependency — the loader in `src/lib/billing/index.ts` builds the specifier at runtime, and the webhook now answers `501 dependency_missing` with the install command when keys are configured but the package is not. The boot guard was tested too: `NODE_ENV=production npm start` without a 32-character `AUTH_SECRET` dies with the documented message instead of serving.
 
 ## What is not switched on — and exactly what would turn it on
 
@@ -160,7 +165,7 @@ PRIVATE OFFICE  €1,500+ per month   unlimited residences, a dedicated team of 
 
 **Billing is an abstraction too** (`src/lib/billing/index.ts`): `DemoBilling` writes subscription state and an open invoice into our database and returns `simulated: true`; `StripeBilling` returns a Checkout URL and a customer-portal URL. `getBillingStatus()` decides which is live and every screen shows it (`billing/provider/simulated` in the API responses). The webhook at `/api/billing/webhook` verifies the Stripe signature, then maps five events — `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted` — onto the subscription row — so "paid" arrives only from the provider, never from a button.
 
-To go live: add the keys, create the three Products in Stripe, put their price ids in `STRIPE_PRICE_*`, and register `https://your.host/api/billing/webhook`.
+To go live: `npm install stripe` — the SDK is deliberately not a dependency, and without it both the checkout and the webhook answer `dependency_missing` instead of pretending; add the keys, create the three Products in Stripe, put their price ids in `STRIPE_PRICE_*`, and register `https://your.host/api/billing/webhook`.
 
 ## Database CLI
 
@@ -183,13 +188,38 @@ node scripts/db-cli.mjs sql "SELECT …"              # read-only; --write for s
 
 ## Launching it
 
-1. **Provision** any Node 18.18+ host. `npm ci && npm run build && npm start` (the `start` script binds `0.0.0.0:3000`; put nginx/Caddy/Cloudflare in front and terminate TLS there).
-2. **Secrets.** `AUTH_SECRET` is mandatory in production — the process throws on boot rather than using the development fallback. Generate with `openssl rand -base64 48`. Everything else in `.env.example` is optional.
-3. **Database.** Default path `./data/velora.db`; set `VELORA_DB_PATH` to put it on a persistent volume. `npm run db:seed` creates the schema; drop the demo data by seeding against an empty file and registering your own principals. Back up with `sqlite3 data/velora.db ".backup …"` — WAL, so a bare file copy while running is not enough.
+1. **Provision** any Node 18.18+ host. `npm ci && npm run build && npm start`. The `start` script is `next start -H 0.0.0.0`: it listens on `$PORT` when a platform injects one (Render, Fly, most PaaS) and on 3000 otherwise. Put nginx/Caddy/Cloudflare in front and terminate TLS there.
+2. **Secrets.** `AUTH_SECRET` is mandatory in production and the refusal is enforced, not advisory: `src/instrumentation.ts` runs at process start and aborts the boot below 32 characters rather than falling back to a development secret that anyone with the repository could forge sessions with. (It skips `next build`, which also runs with `NODE_ENV=production`.) Generate with `openssl rand -base64 48`. Everything else in `.env.example` is optional.
+3. **Database.** Default path `./data/velora.db`; set `VELORA_DB_PATH` to put it on a persistent volume. `npm run db:prepare` (`scripts/prepare-runtime.mjs`) is what a fresh host needs: it creates `data/` and `data/uploads/`, applies `db/schema.sql`, and seeds the demonstration households **only** when `VELORA_SEED_DEMO=1` — those passphrases are published in this repository, so a deployment reachable from the internet should not start with them. `npm run db:seed` is the manual equivalent. Back up with `sqlite3 data/velora.db ".backup …"` — WAL, so a bare file copy while running is not enough.
 4. **Uploads.** `data/uploads/` must be writable and must never be exposed by the web server (it isn't: it is not under `public/`).
-5. **Headers.** `next.config.mjs` ships `nosniff`, `Referrer-Policy`, `Permissions-Policy` on every response. Frame-ancestors and CSP are deliberately left open in this profile so the app can be embedded in preview/ops tooling — `SECURITY.md` has the production set to paste in.
+5. **Headers.** `next.config.mjs` ships `nosniff`, `Referrer-Policy`, `Permissions-Policy` on every response, and `poweredByHeader: false`. In a **production** response it additionally sends `Content-Security-Policy`, `X-Frame-Options: DENY` and HSTS; in development and in a preview build those three are omitted so the app stays embeddable in tooling. `VELORA_ALLOW_FRAMING=1` drops the frame restriction on a production host — intended for an internal dashboard that must embed the app, never for a public one. `SECURITY.md` § 8 has the values and the proxy variant.
 6. **Integrations.** Add Stripe, the model gateway and SMTP only when the accounts exist; the UI adapts by itself and says what is live.
 7. **After the first login**, sign out of the demo accounts, delete them from `/admin/users`, and change `DEMO_CREDENTIALS` in the repository so nobody inherits a known password.
+
+## Deploying on Render
+
+`render.yaml` at the repository root is a Render Blueprint: importing the repository under **New → Blueprint** creates the service, the persistent disk and the environment from that file, so there is nothing to retype and the infrastructure stays reviewable next to the code.
+
+The four decisions inside it, and why:
+
+| | |
+| --- | --- |
+| `plan: starter` | `free` sleeps after 15 idle minutes **and has no disk**, so every redeploy would wake up an empty household. `starter` never sleeps and accepts a disk. |
+| `disk: velora-data` mounted on `/opt/render/project/src/data` | SQLite lives at `data/velora.db` and documents at `data/uploads/`. Mounting the disk over exactly that directory makes both survive a redeploy. Render's own wording on the trade-off: *you can't scale a service with an attached persistent disk* — which costs nothing here, because a single process must own the SQLite file; horizontal scale means the Postgres swap in § Architecture. |
+| `preDeployCommand: node scripts/prepare-runtime.mjs` | Runs before traffic switches over, so the schema is applied and the new build never serves a request against a missing table. `VELORA_SEED_DEMO=1` is set in the file for a demo; switch it to `0` for anything real. |
+| `healthCheckPath: /api/health` | Zero-downtime deploys wait for a real 200. The endpoint also reports which integrations are live, so it doubles as the "is this deployment honest?" check. |
+
+`AUTH_SECRET` is marked `generateValue: true`, which makes Render mint a 256-bit secret and keep it out of the repository; the Stripe, AI, SMTP and public-URL variables are `sync: false`, so the dashboard asks for each one and leaving them empty is a valid answer — the app degrades to what it says on screen, not to a fake.
+
+After the first deploy:
+
+1. Copy the service URL, set `NEXT_PUBLIC_APP_URL` to it, and redeploy once (links in reset e-mails and the checkout return URL are built from it).
+2. Bind a domain under **Settings → Domains** if you have one, then point `NEXT_PUBLIC_APP_URL` at that.
+3. Open the **Shell** in the Render dashboard and run `node scripts/db-cli.mjs promote you@yourdomain.com` to make your own account the first administrator (or `invite` then `promote`, see § The first administrator account).
+4. If the deployment was seeded for a demonstration, delete the three demo households from `/admin/users` before anyone else can log in with published passwords.
+5. Backups: the disk is not snapshotted by Render on its own, so schedule `sqlite3 data/velora.db ".backup …"` (or copy the whole `data/` directory between deploys) and remember WAL means a bare file copy of a live database is not a backup.
+
+What this repository cannot do for you: the deploy itself. Render deploys from a Git host and authorises with your account, so pushing and clicking has to happen with your credentials.
 
 ## The first administrator account
 

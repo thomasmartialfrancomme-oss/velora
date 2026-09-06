@@ -223,8 +223,8 @@ export default async function PropertyDossierPage({ params }: { params: { id: st
             {monthlySpend.length ? (
               <BarChart
                 height={170}
-                data={monthlySpend.map((entry) => ({ label: entry.month.slice(5), value: entry.cents / 100, hint: formatDate(`${entry.month}-01`, 'month', user.timezone) }))}
-                format={(value) => formatMoney(Math.round(value * 100), { currency: user.currency, compact: true })}
+                data={monthlySpend.map((entry) => ({ label: entry.month.slice(5), value: entry.cents, hint: formatDate(`${entry.month}-01`, 'month', user.timezone) }))}
+                format={{ kind: 'money', currency: user.currency, compact: true }}
               />
             ) : (
               <p className="text-[13px] leading-relaxed text-graphite-400">Nothing has been booked to this residence yet.</p>

@@ -12,6 +12,7 @@
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/config';
 import { getDb, newId, nowIso } from '@/lib/db';
+import { loadStripeConstructor } from '@/lib/billing';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,11 +38,28 @@ export async function POST(request: Request) {
     data?: { object?: Record<string, unknown> };
   };
 
+  // Two different failures, two different answers: a missing package is an
+  // operator problem (501, fix the install), a bad signature is a security one
+  // (400, nothing was applied).
+  let Stripe: Awaited<ReturnType<typeof loadStripeConstructor>>;
   try {
-    // @ts-expect-error – optional dependency, loaded only when keys exist.
-    const { default: Stripe } = await import('stripe');
+    Stripe = await loadStripeConstructor();
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: 'dependency_missing',
+          message: error instanceof Error ? error.message : 'The `stripe` package is not installed.',
+        },
+      },
+      { status: 501 },
+    );
+  }
+
+  try {
     const stripe = new Stripe(env.billing.stripeSecretKey, { apiVersion: '2024-06-20' });
-    event = stripe.webhooks.constructEvent(raw, signature, env.billing.stripeWebhookSecret) as never;
+    event = stripe.webhooks.constructEvent(raw, signature, env.billing.stripeWebhookSecret) as typeof event;
   } catch (error) {
     console.error('[velora] webhook rejected', error);
     return NextResponse.json({ ok: false, error: { code: 'signature_invalid', message: 'Webhook signature could not be verified.' } }, { status: 400 });

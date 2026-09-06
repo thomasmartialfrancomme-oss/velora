@@ -1,7 +1,25 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { cn } from '@/lib/utils/format';
+import { cn, formatMoney } from '@/lib/utils/format';
+
+/**
+ * How a chart should speak about its numbers. Values are described, never
+ * handed over as a closure: these components render inside the client tree, and
+ * React refuses to serialise a function sent from a Server Component
+ * (“Functions cannot be passed directly to Client Components”), which fails the
+ * page in production while dev tolerates it. `kind: 'money'` therefore expects
+ * cents, exactly like `formatMoney`.
+ */
+export type ChartValueFormat = { kind: 'plain' } | { kind: 'money'; currency: string; compact?: boolean };
+
+function formatterFor(format: ChartValueFormat | undefined): (value: number) => string {
+  if (format?.kind === 'money') {
+    const { currency, compact } = format;
+    return (cents) => formatMoney(cents, { currency, compact });
+  }
+  return (value) => String(Math.round(value));
+}
 
 /**
  * Hand-drawn SVG charts: no charting dependency, no default palette, and the
@@ -11,19 +29,20 @@ import { cn } from '@/lib/utils/format';
 export function BarChart({
   data,
   height = 190,
-  format = (value: number) => String(value),
+  format,
   tone = 'gold',
   className,
 }: {
   data: { label: string; value: number; hint?: string }[];
   height?: number;
-  format?: (value: number) => string;
+  format?: ChartValueFormat;
   tone?: 'gold' | 'ivory';
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const max = Math.max(1, ...data.map((d) => d.value));
+  const render = formatterFor(format);
 
   useEffect(() => {
     const node = ref.current;
@@ -50,7 +69,7 @@ export function BarChart({
                   tone === 'gold' ? 'text-gold-200/85' : 'text-ivory-200/80',
                 )}
               >
-                {format(item.value)}
+                {render(item.value)}
               </span>
               <div
                 className={cn(
@@ -76,18 +95,19 @@ export function LineChart({
   points,
   labels = [],
   height = 150,
-  format = (value: number) => String(value),
+  format,
   className,
 }: {
   points: number[];
   labels?: string[];
   height?: number;
-  format?: (value: number) => string;
+  format?: ChartValueFormat;
   className?: string;
 }) {
   const gradientId = useId();
   const [visible, setVisible] = useState(false);
   const ref = useRef<SVGSVGElement>(null);
+  const render = formatterFor(format);
 
   useEffect(() => {
     const node = ref.current;
@@ -142,11 +162,11 @@ export function LineChart({
         {coordinates.map((point, index) => (
           <g key={index}>
             <circle cx={point.x} cy={point.y} r={index === coordinates.length - 1 ? 2.8 : 1.8} fill={index === coordinates.length - 1 ? 'rgb(240 227 205)' : 'rgb(201 169 106)'} opacity={visible ? 1 : 0} style={{ transition: `opacity 500ms ease ${400 + index * 90}ms` }} />
-            <title>{`${labels[index] ?? ''} ${format(point.value)}`}</title>
+            <title>{`${labels[index] ?? ''} ${render(point.value)}`}</title>
           </g>
         ))}
         <text x={last.x} y={Math.max(12, last.y - 10)} textAnchor="end" className="fill-ivory-100 text-[10px]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-          {format(last.value)}
+          {render(last.value)}
         </text>
       </svg>
       {labels.length ? (

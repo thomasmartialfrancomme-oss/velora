@@ -1,0 +1,128 @@
+# ─────────────────────────────────────────────────────────────
+# VELORA PRIVATE — Render Blueprint
+# https://render.com/docs/blueprint-spec
+#
+# How to use it: push this repository to GitHub, then in Render choose
+# New → Blueprint and pick that repository. Render reads this file and
+# creates the service, the disk and the environment for you.
+#
+# Two things to understand before you deploy a stateful app like this:
+#
+#  1. The database is SQLite (data/velora.db) and uploaded documents live in
+#     data/uploads/. Both must sit on a persistent disk, or every redeploy
+#     starts from an empty household. That is what the `disk:` block below is
+#     for, and why the disk is mounted on the repo's own data/ directory.
+#
+#  2. `plan: free` has NO disk and sleeps after 15 idle minutes. Handy for a
+#     first look, useless for anything a client touches: switch to
+#     `plan: free`, accept that data resets on each deploy, or keep `starter`
+#     (never sleeps, 1 GB disk). One service + one disk is the whole cost.
+# ─────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: velora-private
+    runtime: node
+    plan: starter # free = sleeps + no persistent disk; starter = never sleeps + disk
+    # Frankfurt keeps the household data in the EU and is the closest of Render's
+    # five regions (oregon, ohio, virginia, frankfurt, singapore) to Europe and
+    # the Indian Ocean. A region cannot be changed after creation — if your
+    # clients are elsewhere, set it right the first time, and keep any future
+    # Postgres in the same region so private networking works.
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci && npm run build
+    # Render injects $PORT; `next start` reads it, so nothing here is hardcoded.
+    startCommand: npm start
+    # Runs before the new version takes traffic: creates the data directory,
+    # applies db/schema.sql, seeds demo households only if VELORA_SEED_DEMO=1.
+    preDeployCommand: node scripts/prepare-runtime.mjs
+    # Zero-downtime deploys: /api/health reports the live state of the database,
+    # billing, the AI provider and email, and answers 200 when the app is usable.
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    # A one-time job (seeding, a first import) belongs in `initialDeployHook`,
+    # which Render runs after the first successful deploy of a service and never
+    # again; `preDeployCommand` above runs on every deploy and is idempotent.
+    maxShutdownDelaySeconds: 20
+
+    disk:
+      name: velora-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1 # minimum is 1 GB. Render lets you grow a disk but never shrink it.
+      # Note: Render's docs are explicit that a service with an attached disk
+      # cannot be scaled — vertical or horizontal. That is not a loss here: one
+      # process owns the SQLite file, which is why multi-instance deployments
+      # would need the Postgres swap described in README.md § Architecture.
+
+    envVars:
+      # --- runtime identity ------------------------------------------------
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: '20'
+
+      # --- signing ----------------------------------------------------------
+      # Mandatory: src/instrumentation.ts refuses to boot a production process
+      # without a secret of 32+ characters. generateValue lets Render create a
+      # 256-bit one and keep it out of the repository.
+      - key: AUTH_SECRET
+        generateValue: true
+
+      # --- storage ----------------------------------------------------------
+      - key: VELORA_DB_PATH
+        value: /opt/render/project/src/data/velora.db
+
+      # --- demo vs real ------------------------------------------------------
+      # '1' seeds the published demonstration households (known passphrases in
+      # README.md). Set it to '0' the moment this host is anything other than a
+      # demo, then sign up at /register and run
+      #   node scripts/db-cli.mjs promote you@yourdomain.com
+      # in the Render shell to create the first administrator.
+      - key: VELORA_SEED_DEMO
+        value: '1'
+
+      # --- public origin used for links in emails and callbacks -------------
+      # Set this to the real URL after the first deploy (…onrender.com or your
+      # custom domain), then redeploy so the value is baked where it matters.
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+
+      # --- optional integrations: leave unset and the app stays honest ------
+      # No key  →  billing is recorded locally and every screen says nothing
+      # was charged; the coordinator answers from your own rows without an
+      # external call; reset and invite links are written to the service log.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_PRIVATE
+        sync: false
+      - key: STRIPE_PRICE_PRIORITY
+        sync: false
+      - key: STRIPE_PRICE_PRIVATE_OFFICE
+        sync: false
+      - key: AI_PROVIDER
+        sync: false
+      - key: AI_PROVIDER_URL
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        sync: false
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+
+# Uncomment to let Render create a managed Postgres as well. The application
+# reads SQLite today (src/lib/db/index.ts is the single swap point, documented
+# in README.md § Architecture); this block is here so the infrastructure decision
+# can be reviewed with the code, not invented later.
+#
+# databases:
+#   - name: velora-db
+#     plan: starter
+#     region: oregon
+#     ipAllowList: []          # internal connections only
+#     postgresMajorVersion: '16'

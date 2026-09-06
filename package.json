@@ -2,11 +2,11 @@
   "name": "velora-private",
   "version": "1.0.0",
   "private": true,
-  "description": "VELORA PRIVATE \u2014 AI Private Estate & Lifestyle Manager",
+  "description": "VELORA PRIVATE — AI Private Estate & Lifestyle Manager",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 3000",
+    "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:status": "node --no-warnings scripts/db-cli.mjs status",
@@ -16,7 +16,8 @@
     "db:users": "node --no-warnings scripts/db-cli.mjs users",
     "db:sql": "node --no-warnings scripts/db-cli.mjs sql",
     "check": "npm run typecheck && npm run db:verify",
-    "smoke": "node --no-warnings scripts/smoke.mjs"
+    "smoke": "node --no-warnings scripts/smoke.mjs",
+    "db:prepare": "node --no-warnings scripts/prepare-runtime.mjs"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -37,6 +38,8 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "autoprefixer": "10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.33",
     "postcss": "8.4.49",
     "tailwindcss": "3.4.17",
     "typescript": "5.6.3"

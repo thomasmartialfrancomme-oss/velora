@@ -235,9 +235,9 @@ export default async function FinancePage({ searchParams }: { searchParams?: Rec
             <PanelHeader label="Trend" title="Twelve months" description="Recorded spend per month, oldest on the left." />
             <Divider className="my-5" />
             <LineChart
-              points={summary.trend.map((entry) => entry.cents / 100)}
+              points={summary.trend.map((entry) => entry.cents)}
               labels={summary.trend.map((entry) => entry.month.slice(5))}
-              format={(value) => formatMoney(Math.round(value * 100), { currency: user.currency, compact: true })}
+              format={{ kind: 'money', currency: user.currency, compact: true }}
             />
           </Panel>
 

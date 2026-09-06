@@ -133,33 +133,40 @@ type StripeLike = {
   billingPortal: { sessions: { create(params: Record<string, unknown>): Promise<{ url?: string | null; id?: string }> } };
   customers: { create(params: Record<string, unknown>): Promise<{ id: string }> };
   subscriptions: { cancel(id: string, params?: Record<string, unknown>): Promise<unknown> };
+  webhooks: { constructEvent(rawBody: string, signature: string, secret: string): unknown };
 };
+
+/**
+ * `stripe` is deliberately NOT a dependency of this project: the platform must
+ * boot and serve a full household with no payment provider installed. The
+ * specifier is built at runtime and marked `webpackIgnore` so the bundler never
+ * tries to resolve it at build time — otherwise `next build` fails on a missing
+ * module. Callers that need real Stripe get a loud, actionable error instead.
+ */
+export async function loadStripeConstructor(): Promise<new (secret: string, options: Record<string, unknown>) => StripeLike> {
+  try {
+    const specifier = 'stripe';
+    const loaded = (await import(/* webpackIgnore: true */ /* @vite-ignore */ specifier)) as {
+      default?: new (secret: string, options: Record<string, unknown>) => StripeLike;
+    };
+    const Stripe = loaded.default;
+    if (typeof Stripe !== 'function') throw new Error('module has no constructor');
+    return Stripe;
+  } catch {
+    throw new ConstraintError('Stripe keys are present but the `stripe` package is not installed. Run: npm install stripe');
+  }
+}
 
 class StripeBilling implements BillingProvider {
   readonly id = 'stripe' as const;
   readonly label = 'Stripe';
   readonly configured = true;
 
-  /**
-   * `stripe` is deliberately NOT a dependency of this project: the platform must
-   * boot with no payment provider. The specifier is built at runtime and marked
-   * `webpackIgnore` so the bundler never resolves it; if keys are present and the
-   * package has been installed, the real SDK is loaded here and only here.
-   */
   private async client(): Promise<StripeLike> {
     const key = env.billing.stripeSecretKey;
     if (!key) throw new ConstraintError('STRIPE_SECRET_KEY is not set.');
-    try {
-      const specifier = 'stripe';
-      const loaded = (await import(/* webpackIgnore: true */ /* @vite-ignore */ specifier)) as {
-        default?: new (secret: string, options: Record<string, unknown>) => StripeLike;
-      };
-      const Stripe = loaded.default;
-      if (typeof Stripe !== 'function') throw new Error('module has no constructor');
-      return new Stripe(key, { apiVersion: '2024-06-20' });
-    } catch {
-      throw new ConstraintError('Stripe keys are present but the `stripe` package is not installed. Run: npm install stripe');
-    }
+    const Stripe = await loadStripeConstructor();
+    return new Stripe(key, { apiVersion: '2024-06-20' });
   }
 
   async checkout(ctx: BillingContext): Promise<BillingIntent> {
