@@ -77,6 +77,12 @@ Trois limites de ce chemin, dites à l'écran plutôt que cachées :
 - **Ne diffusez pas votre base** : le fichier `data/velora.db` contient la connexion chiffrée ;
   un zip de sauvegarde n'est pas un artefact à publier.
 
+> **Le catalogue est partagé.** Les deux chemins posent les mêmes `lookup_key`
+> (`velora-<plan>-<cycle>`) sur les prix, donc brancher `/admin` puis plus tard passer par
+> l'environnement ne crée pas un deuxième jeu de tarifs chez Stripe : le second retrouve le
+> premier. C'est aussi ce qui rend la reconnexion sans danger — vérifié par le harnais, qui
+> rejoue la connexion et exige `créés: 0, réutilisés: 6`.
+
 ### 3 ter. Le chemin environnement (recommandé dès que vous avez un disque persistant)
 
 ```bash

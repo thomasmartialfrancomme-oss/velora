@@ -51,6 +51,12 @@ const MOCK = {
   customerSeq: 0, sessionSeq: 0, subSeq: 0, invoiceSeq: 0,
   /** ce que « connecter mon compte » doit pouvoir retrouver au deuxième essai */
   prices: new Map(), products: new Map(), portal: new Map(), endpoints: [],
+  // Des prix que le compte contient déjà et qui ne sont pas à nous : un code qui lit
+  // data[0] sans vérifier le lookup key renverrait price_stranger_1 au lieu de notre tarif.
+  extraPrices: [
+    { id: 'price_stranger_1', lookup_key: null, object: 'price', currency: 'eur', unit_amount: 7900, type: 'recurring', recurring: { interval: 'month' }, active: true },
+    { id: 'price_stranger_2', lookup_key: 'autre-chose', object: 'price', currency: 'eur', unit_amount: 100, type: 'recurring', recurring: { interval: 'year' }, active: true },
+  ],
 };
 
 /* ------------------------------------------------------------ the mock */
@@ -106,7 +112,7 @@ const mock = http.createServer((request, response) => {
     const raw = Buffer.concat(chunks).toString('utf8');
     const params = raw ? decodeStripeForm(raw) : {};
     const url = new URL(request.url, `http://127.0.0.1:${MOCK_PORT}`);
-    const record = { method: request.method, path: url.pathname, params, raw, headers: { ...request.headers } };
+    const record = { method: request.method, path: url.pathname, params, raw, search: url.searchParams, headers: { ...request.headers } };
     REQUESTS.push(record);
 
     const idempotency = request.headers['idempotency-key'] ?? null;
@@ -159,9 +165,20 @@ const mock = http.createServer((request, response) => {
     }
     if (request.method === 'POST' && url.pathname === '/v1/prices') {
       const lookup = String(params.lookup_key ?? '');
-      let id = MOCK.prices.get(lookup);
-      if (!id) { id = `price_check_${MOCK.prices.size + 1}`; if (lookup) MOCK.prices.set(lookup, id); }
-      return reply(response, 200, { id, object: 'price', currency: params.currency, unit_amount: Number(params.unit_amount), recurring: { interval: params.recurring?.interval } });
+      const known = lookup ? MOCK.prices.get(lookup) : null;
+      const row = known ?? {
+        id: `price_check_${MOCK.prices.size + 1}`,
+        object: 'price',
+        lookup_key: lookup || null,
+        currency: String(params.currency ?? 'eur'),
+        unit_amount: Number(params.unit_amount ?? 0),
+        type: 'recurring',
+        recurring: { interval: String(params.recurring?.interval ?? 'month') },
+        product: String(params.product ?? ''),
+        active: true,
+      };
+      if (lookup && !known) MOCK.prices.set(lookup, row);
+      return reply(response, 200, row);
     }
     if (request.method === 'POST' && url.pathname === '/v1/billing_portal/configurations') {
       const name = String(params.name ?? '');
@@ -192,10 +209,51 @@ const mock = http.createServer((request, response) => {
         },
       });
     }
-    if (request.method === 'GET' && url.pathname === '/v1/prices/lookup') {
-      const id = MOCK.prices.get(url.searchParams.get('lookup_key'));
-      if (!id) return reply(response, 404, { error: { type: 'invalid_request_error', code: 'resource_missing', message: 'No price found for that lookup key.' } });
-      return reply(response, 200, { id, object: 'price' });
+    // GET /v1/prices — la liste, seuls filtres documentés. Stripe refuse tout paramètre
+    // inconnu ici comme sur « retrieve », donc le harnais fait de même : un code qui envoie
+    // lookup_key (au lieu de lookup_keys[0]) doit échouer ici comme il échoue en production.
+    const LIST_PRICE_PARAMS = ['active', 'currency', 'product', 'type', 'created', 'ending_before', 'limit', 'recurring', 'starting_after'];
+    if (request.method === 'GET' && url.pathname === '/v1/prices') {
+      const requestedKeys = [...url.searchParams.entries()].filter(([k]) => /^lookup_keys\[\d+\]$/.test(k)).map(([, v]) => v);
+      if (MOCK.legacyLookup?.size && requestedKeys.some((k) => MOCK.legacyLookup.has(k))) {
+        // Version d'API antérieure au filtre : Stripe répond exactement ceci.
+        return reply(response, 400, { error: { type: 'invalid_request_error', param: 'lookup_keys[0]', message: 'Received unknown parameter: lookup_keys[0].' } });
+      }
+      for (const name of url.searchParams.keys()) {
+        if (!/^lookup_keys\[\d+\]$/.test(name) && !LIST_PRICE_PARAMS.includes(name)) {
+          return reply(response, 400, { error: { type: 'invalid_request_error', param: name, message: `Received unknown parameter: ${name}.` } });
+        }
+      }
+      const wanted = [...url.searchParams.entries()].filter(([k]) => /^lookup_keys\[\d+\]$/.test(k)).map(([, v]) => v);
+      const rows = [...MOCK.prices.values(), ...MOCK.extraPrices].filter((row) => {
+        if (wanted.length && !wanted.includes(String(row.lookup_key ?? ''))) return false;
+        if (url.searchParams.get('type') && row.type !== url.searchParams.get('type')) return false;
+        if (url.searchParams.get('currency') && row.currency !== url.searchParams.get('currency')) return false;
+        if (url.searchParams.get('product') && row.product !== url.searchParams.get('product')) return false;
+        if (url.searchParams.get('active') === 'true' && row.active === false) return false;
+        return true;
+      });
+      const limit = Math.min(100, Number(url.searchParams.get('limit') ?? 10));
+      return reply(response, 200, { object: 'list', url: '/v1/prices', has_more: false, data: rows.slice(0, limit) });
+    }
+    // GET /v1/prices/search — documenté, mais incohérent après écriture : le produit ne doit
+    // jamais l'emprunter. Le harnais y répond pour qu'un contrôle puisse le vérifier.
+    if (request.method === 'GET' && url.pathname === '/v1/prices/search') {
+      const q = url.searchParams.get('query') ?? '';
+      const rows = [...MOCK.prices.values()].filter((row) => row.lookup_key && q.includes(String(row.lookup_key)));
+      return reply(response, 200, { object: 'search_result', url: '/v1/prices/search', has_more: false, data: rows });
+    }
+    // GET /v1/prices/:id — « retrieve » n'accepte aucun paramètre, et un id qui ne ressemble
+    // à rien renvoie resource_missing. C'est ce qui transforme une route inventée en échec.
+    const priceIdMatch = /^\/v1\/prices\/([^/]+)$/.exec(url.pathname);
+    if (request.method === 'GET' && priceIdMatch) {
+      const id = priceIdMatch[1];
+      if (![...MOCK.prices.values(), ...MOCK.extraPrices].some((row) => row.id === id)) {
+        return reply(response, 404, { error: { type: 'invalid_request_error', code: 'resource_missing', param: 'id', message: `No such price: '${id}'.` } });
+      }
+      const stray = [...url.searchParams.keys()][0];
+      if (stray) return reply(response, 400, { error: { type: 'invalid_request_error', param: stray, message: `Received unknown parameter: ${stray}.` } });
+      return reply(response, 200, [...MOCK.prices.values(), ...MOCK.extraPrices].find((row) => row.id === id));
     }
     if (request.method === 'GET' && url.pathname === '/v1/products') {
       return reply(response, 200, { object: 'list', data: [...MOCK.products].map(([name, id]) => ({ id, name })) });
@@ -509,8 +567,17 @@ try {
   check('la connexion part du compte lu chez Stripe', connect.status === 200 && outcome?.accountId === 'acct_check_1', JSON.stringify(connect.json).slice(0, 180));
   check('le nom du compte revient pour l’affichage', outcome?.accountName === 'Velora Test SARL', JSON.stringify(outcome?.accountName));
   check('les six prix du catalogue sont créés', MOCK.prices.size === 6 && outcome?.pricesCreated === 6, JSON.stringify({ size: MOCK.prices.size, created: outcome?.pricesCreated }));
-  const priceAmounts = REQUESTS.filter((entry) => entry.path === '/v1/prices').map((entry) => String(entry.params?.unit_amount));
+  const priceAmounts = REQUESTS.filter((entry) => entry.path === '/v1/prices' && entry.method === 'POST').map((entry) => String(entry.params?.unit_amount));
   check('aux montants exacts du catalogue', JSON.stringify(priceAmounts.slice(-6)) === JSON.stringify(['19900', '214920', '49900', '526944', '150000', '1800000']), JSON.stringify(priceAmounts.slice(-6)));
+  // Le filet qui manque ici est celui qui a manqué la fois dernière : le harnais validait
+  // l'idée que je m'étais faite de l'API, pas l'API. Ces trois lignes refusent une route
+  // inventée, exigent le filtre documenté, et interdisent la recherche incohérente.
+  const readCalls = REQUESTS.filter((entry) => entry.method === 'GET' && /^\/v1\/prices/.test(entry.path));
+  check('un prix se relit par lookup_keys[0] sur GET /v1/prices', readCalls.some((entry) => entry.path === '/v1/prices' && [...entry.search.keys()].some((k) => /^lookup_keys\[\d+\]$/.test(k))), readCalls.map((e) => e.path + e.search.toString()).slice(0, 2).join(' · '));
+  check('aucune route inventée n’est appelée', !REQUESTS.some((entry) => /\/lookup(\?|$)/.test(entry.path + entry.search.toString())), JSON.stringify(REQUESTS.filter((e) => /lookup$/.test(e.path)).map((e) => e.path).slice(0, 3)));
+  check('la recherche éventuellement incohérente n’est pas utilisée', !REQUESTS.some((entry) => entry.path === '/v1/prices/search'), 'GET /v1/prices/search trouvé dans le journal');
+  const priceIds = [...MOCK.prices.values()].map((row) => row.id);
+  check('les prix relus sont les nôtres, pas un prix voisin du compte', priceIds.length === 6 && priceIds.every((id) => id.startsWith('price_check_')), JSON.stringify(priceIds));
   const webhookCall = [...REQUESTS].reverse().find((entry) => entry.path === '/v1/webhook_endpoints' && entry.method === 'POST');
   check('le webhook est créé sur la bonne URL avec sept événements', String(webhookCall?.params?.url) === `${BASE2}/api/billing/webhook` && (webhookCall?.params?.enabled_events ?? []).length === 7, JSON.stringify(webhookCall?.params?.enabled_events));
   check('chaque écriture porte une clé d’idempotence', [...REQUESTS].filter((entry) => entry.method === 'POST' && /^\/v1\/(prices|products|webhook_endpoints|billing_portal\/configurations)$/.test(entry.path)).every((entry) => entry.headers['idempotency-key']), 'écritures sans en-tête Idempotency-Key');
@@ -545,7 +612,13 @@ try {
   check('l’événement signé avec le secret reçu à la création est accepté', accepted.status === 200, `reçu ${accepted.status}`);
   check('l’ancienne clé de signature ne fait plus confiance', staleSecret.status === 400, `reçu ${staleSecret.status}`);
 
-  // re-brancher le même compte : rien ne doit être créé deux fois
+  // Re-brancher le même compte, mais en faisant semblant qu'un prix est vu par une application
+  // dont le compte Stripe est épinglé sur une version de l'API antérieure au filtre
+  // lookup_keys : la relecture de celui-là doit retomber sur le balayage paginé, et le prix
+  // doit quand même être retrouvé — sinon un client réel perdrait un tarif et en paierait un
+  // autre créé en double.
+  MOCK.legacyLookup = new Set(['velora-private_office-annual']);
+  const scanBefore = REQUESTS.length;
   const again = await call2('/api/admin/billing-connection', {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: BASE2 },
@@ -553,6 +626,9 @@ try {
   });
   const againOutcome = again.json?.data?.outcome;
   check('reconnecter le même compte ne duplique aucun prix', againOutcome?.pricesCreated === 0 && againOutcome?.pricesReused === 6, JSON.stringify({ created: againOutcome?.pricesCreated, reused: againOutcome?.pricesReused }));
+  const scanned = REQUESTS.slice(scanBefore).filter((entry) => entry.method === 'GET' && entry.path === '/v1/prices' && entry.search.get('limit') === '100');
+  check('le prix inaccessible par filtre est retrouvé au balayage', scanned.length > 0 && againOutcome?.pricesReused === 6 && againOutcome?.pricesCreated === 0, JSON.stringify({ balayages: scanned.length, reused: againOutcome?.pricesReused }));
+  MOCK.legacyLookup = new Set();
   check('et que le portail existant est réutilisé', againOutcome?.portalCreated === false, JSON.stringify(againOutcome?.portalCreated));
   check('un second endpoint webhook n’est pas créé pour rien', MOCK.endpoints.length === 1 && againOutcome?.webhookCreated === false, JSON.stringify({ endpoints: MOCK.endpoints.map((e) => e.id), created: againOutcome?.webhookCreated }));
 

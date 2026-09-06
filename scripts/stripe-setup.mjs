@@ -125,14 +125,14 @@ for (const plan of plans) {
   const monthlyPrice = await call(
     'POST',
     '/v1/prices',
-    { product: product.id, currency: 'eur', unit_amount: plan.monthly, 'recurring[interval]': 'month', 'metadata[veloraPlan]': plan.key },
+    { product: product.id, currency: 'eur', unit_amount: plan.monthly, 'recurring[interval]': 'month', lookup_key: `velora-${plan.key}-monthly`, 'metadata[veloraPlan]': plan.key },
     `prix mensuel ${plan.name} (${(plan.monthly / 100).toFixed(2)} €)`,
     `velora-price-${plan.key}-monthly`,
   );
   const annualPrice = await call(
     'POST',
     '/v1/prices',
-    { product: product.id, currency: 'eur', unit_amount: annual, 'recurring[interval]': 'year', 'metadata[veloraPlan]': plan.key },
+    { product: product.id, currency: 'eur', unit_amount: annual, 'recurring[interval]': 'year', lookup_key: `velora-${plan.key}-annual`, 'metadata[veloraPlan]': plan.key },
     `prix annuel ${plan.name} (${(annual / 100).toFixed(2)} €)`,
     `velora-price-${plan.key}-annual`,
   );

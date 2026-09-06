@@ -107,14 +107,69 @@ export function looksLikeStripeKey(value: string): boolean {
   return /^sk_(test|live)_[A-Za-z0-9_]{4,}$/.test(value.trim());
 }
 
+/** A price row, as far as this file cares about it. */
+interface PriceRow {
+  id: string;
+  lookup_key?: string | null;
+  unit_amount?: number | null;
+  currency?: string;
+  active?: boolean;
+  product?: string;
+  recurring?: { interval?: string } | null;
+}
+
+/**
+ * Find the price Stripe already holds for one of our plans, by lookup key.
+ *
+ * There is no `GET /v1/prices/lookup`. The documented way is the list endpoint with the
+ * indexed array filter, `GET /v1/prices?lookup_keys[0]=…`. A path of the form
+ * `/v1/prices/something` is read by Stripe as *retrieve the price whose id is "something"*,
+ * and that endpoint takes no parameters — so an invented path plus a query string does not
+ * fail with "no such route", it fails with `Received unknown parameter: lookup_key`. That is
+ * what an operator hit on their first connection attempt; the local harness had stubbed the
+ * invented route, which is precisely why 59 checks passed and the feature did not work.
+ *
+ * `/v1/prices/search` is deliberately not used, even though it also takes a lookup key: it is
+ * eventually consistent (up to an hour behind during an outage), and this function is called
+ * right after a price is created.
+ *
+ * An account pinned to an API version that predates the filter gets an unknown-parameter error
+ * back, so that one error falls back to scanning active recurring prices and matching the key
+ * here — two documented routes, neither of them invented.
+ */
 async function lookupPrice(lookupKey: string, secret: string): Promise<string> {
   try {
-    const found = await stripeRequest<{ id?: string }>('/v1/prices/lookup', { secret, method: 'GET', query: { lookup_key: lookupKey } });
-    return found.id ?? '';
+    const list = await stripeRequest<{ data?: PriceRow[] }>('/v1/prices', {
+      secret,
+      method: 'GET',
+      query: { 'lookup_keys[0]': lookupKey, type: 'recurring', active: 'true', limit: 1 },
+    });
+    // Stripe narrows by the filter; matching again costs nothing and means a filter the API
+    // quietly ignores cannot return someone else's price.
+    return list.data?.find((price) => price.lookup_key === lookupKey)?.id ?? '';
   } catch (error) {
-    if (error instanceof StripeError && (error.status === 404 || error.code === 'resource_missing')) return '';
-    throw error;
+    if (!(error instanceof StripeError) || !/unknown parameter/i.test(error.message)) throw error;
+    return scanPricesFor(lookupKey, secret);
   }
+}
+
+/** Up to 1 000 active recurring prices, enough for any account we will meet. */
+async function scanPricesFor(lookupKey: string, secret: string, pages = 10): Promise<string> {
+  let after: string | undefined;
+  for (let page = 0; page < pages; page += 1) {
+    const list = await stripeRequest<{ data?: PriceRow[] }>('/v1/prices', {
+      secret,
+      method: 'GET',
+      query: { type: 'recurring', active: 'true', limit: 100, ...(after ? { starting_after: after } : {}) },
+    });
+    const rows = list.data ?? [];
+    const match = rows.find((price) => price.lookup_key === lookupKey);
+    if (match) return match.id;
+    if (rows.length < 100) return '';
+    after = rows[rows.length - 1]?.id;
+    if (!after) return '';
+  }
+  return '';
 }
 
 async function findProductByName(name: string, secret: string): Promise<string> {

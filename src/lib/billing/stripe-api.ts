@@ -65,6 +65,8 @@ export function encodeStripeForm(params: { [key: string]: FormValue }, prefix = 
 export interface StripeRequestOptions {
   method?: 'GET' | 'POST' | 'DELETE';
   params?: { [key: string]: FormValue };
+  /** Query string for a read. Array filters are written the way Stripe serialises them, as
+   *  indexed keys — `{ 'lookup_keys[0]': 'velora-private-monthly' }`, not an array value. */
   query?: Record<string, string | number | undefined>;
   idempotencyKey?: string;
   secret?: string;
@@ -79,7 +81,7 @@ export async function stripeRequest<T = Record<string, unknown>>(path: string, o
 
   const base = (runtime.apiBase || 'https://api.stripe.com').replace(/\/$/, '');
   // A call with no body is a read, whether or not the path itself carries a query:
-  // `GET /v1/account`, `GET /v1/prices/lookup?lookup_key=…` and the list endpoints all
+  // `GET /v1/account`, `GET /v1/prices?lookup_keys[0]=…` and the list endpoints all
   // arrive here with `query` only. Inferring the verb from the path string alone turned
   // those into POSTs, which Stripe refuses — caught by the harness, not by a type.
   const method = options.method ?? (options.query || path.includes('?') || !Object.keys(options.params ?? {}).length ? 'GET' : 'POST');
