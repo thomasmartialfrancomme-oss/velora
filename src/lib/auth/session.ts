@@ -76,6 +76,22 @@ export async function createSession(userId: string): Promise<void> {
   });
 }
 
+/**
+ * Mirror a member's stored language into the request cookie.
+ *
+ * `createSession` already does this at sign-in, and the language switcher on the
+ * marketing site does it explicitly — but the profile form writes `users.locale`
+ * without touching the cookie, so on the device in front of you the interface stayed
+ * in the previous language until you signed out. Measured, not theorised: a member
+ * who switched to French got `lang="en"` back and reasonably concluded the product
+ * was broken. Same attributes as the sign-in mirror, from one place.
+ */
+export function syncLocaleCookie(locale: string | null | undefined): void {
+  const uiLocale = fromBcp47(locale);
+  if (!uiLocale) return;
+  cookies().set(LOCALE_COOKIE, uiLocale, { ...cookieOptions(), httpOnly: true, maxAge: 60 * 60 * 24 * 365 });
+}
+
 export async function destroySession(): Promise<void> {
   cookies().delete(SESSION_COOKIE);
 }

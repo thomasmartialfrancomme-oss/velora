@@ -2,6 +2,7 @@
 import { api } from '@/lib/http/handler';
 import { profileSchema } from '@/lib/validation/schemas';
 import { getDb, audit, nowIso } from '@/lib/db';
+import { syncLocaleCookie } from '@/lib/auth/session';
 import { fail } from '@/lib/http/responses';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,13 @@ export const PATCH = api({
       },
     );
     audit({ userId: user.id, event: 'account.updated' });
-    return { updated: true };
+    const fresh = getDb().get<{ locale: string; timezone: string; currency: string }>(
+      `SELECT locale, timezone, currency FROM users WHERE id = @id`,
+      { id: user.id },
+    );
+    if (fresh) syncLocaleCookie(fresh.locale);
+    // Le formulaire de réglages relit l'état depuis la base : renvoyer la ligne fraîche
+    // coûte un SELECT et évite d'afficher la valeur d'avant l'enregistrement.
+    return { updated: true, ...(fresh ?? {}) };
   },
 });
