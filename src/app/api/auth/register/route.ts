@@ -10,6 +10,7 @@ import { createUser, createSession } from '@/lib/auth/session';
 import { registerSchema } from '@/lib/validation/schemas';
 import { fail, toErrorResponse } from '@/lib/http/responses';
 import { clientIp, hashIp, rateLimitAuth } from '@/lib/http/security';
+import { campaignFromRequest } from '@/lib/marketing/attribution';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +40,16 @@ export async function POST(request: Request) {
       { email },
     );
 
-    const id = await createUser({ email, password, firstName, lastName, role: 'owner', country: country || null, timezone: timezone || 'Europe/Paris' });
+    const id = await createUser({
+      email,
+      password,
+      firstName,
+      lastName,
+      role: 'owner',
+      country: country || null,
+      timezone: timezone || 'Europe/Paris',
+      campaign: campaignFromRequest(request),
+    });
     if (invited) {
       db.run(`UPDATE access_requests SET status = 'invited', reviewer_note = 'Account created by the applicant.', updated_at = @ts WHERE id = @id`, {
         ts: new Date().toISOString(),

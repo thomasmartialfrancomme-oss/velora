@@ -14,8 +14,9 @@ applicable) de ce qui est **à vérifier chez vous** (volumes de requêtes, cart
 2. **Le paiement doit être réel.** Tant que `STRIPE_SECRET_KEY` est absent, l'écran d'adhésion
    annonce honnêtement « démonstration, aucun paiement ». Du trafic payant qui aboutit là
    est de l'argent brûlé à prouver que le produit plaît — utile, mais ne vendez pas encore.
-   Sinon, remplacez l'objectif par « demande d'accès » (le formulaire existe, il journalise
-   la provenance : colonne « Heard of us » de la console).
+   Sinon, l'objectif devient « demande d'accès » : le formulaire existe, la provenance est
+   congelée (cookie → ligne → console → invitation), et le contrôle `npm run check:attribution`
+   le prouve de bout en bout.
 3. **Un prix d'entrée à 199 € existe** (`src/lib/utils/format.ts` : PRIVATE 19 900,
    PRIORITY 49 900, PRIVATE OFFICE 150 000 en centimes, mensuel). Sans offre à ce niveau,
    aucun canal payant ne compense un cycle de vente de plusieurs mois.
@@ -157,11 +158,24 @@ https://velora.app/membership?utm_source=linkedin&utm_medium=paid&utm_campaign=f
 https://velora.app/?utm_source=google&utm_medium=cpc&utm_campaign=family-office-software&utm_content=famille-exacte
 ```
 
-Ce qui est déjà mesurable dans le produit : le formulaire de demande d'accès enregistre
-l'origine (colonne `referrer`, visible dans Console → Demandes d'accès), et l'export JSON du
-compte emporte tout. Ce qui manque et que je peux ajouter sur demande (environ une demi-journée) :
-trois colonnes `utm_source / utm_medium / utm_campaign` figées à l'inscription, la colonne en
-console, un filtre par campagne, et un contrôle automatique de plus dans la suite.
+**C'est mesuré dans le produit, depuis ce commit.** Le middleware de bord plante un cookie
+`velora_campaign` (httpOnly, SameSite=Lax, 30 jours) sur la page d'atterrissage ; la demande
+d'accès **et** le compte créé gèlent `utm_source / utm_medium / utm_campaign / utm_content` dans
+leurs colonnes ; une invitation depuis la console fait suivre la campagne au nouveau compte ; et
+la file d'accès affiche « Paid campaign » ou « organic / direct ». Sans paramètre, rien n'est
+écrit : le vide veut dire organique, et c'est ce qui rend « 6 comptes, tous LinkedIn » lisible.
+
+`npm run check:attribution` rejoue le parcours entier contre un serveur en marche — 25 contrôles :
+le cookie posé, sa traversée d'une page sans paramètres, la ligne écrite, l'écran de l'administrateur,
+l'invitation qui hérite de la campagne, et une valeur hostile dans l'URL qui n'arrive qu'en texte
+nettoyé. À brancher dans la CI avec la suite normale.
+
+> En écrivant ce contrôle, un vrai défaut est sorti : le filtre par défaut de la file d'accès
+> cherchait l'état littéral `open`, qu'aucune ligne ne porte — la page affichait
+> « Personne n'attend » pendant que son propre en-tête comptait quatre demandes à lire. Un
+> trafic payant lancé avant ce correctif aurait donc ressemblé à un échec commercial pendant
+> que les demandes s'empilaient sans être vues. Corrigé (`new` + `reviewing` = « Needs a
+> decision ») et verrouillé par deux contrôles de plus dans la suite d'attribution.
 Ne branchez pas Google Analytics tant que le bandeau de consentement ne pose pas un choix réel :
 sur ce public, un cookie de traçage mal annoncé coûte plus qu'il ne rapporte.
 
@@ -174,6 +188,59 @@ sur ce public, un cookie de traçage mal annoncé coûte plus qu'il ne rapporte.
   ne promet que ce que le produit fait, et le message de suivi part vers ceux qui l'ont rempli.
 - Les publicités financières sur Meta sont restreintes par pays : si un refus arrive, ne
   reformulez pas pour contourner le filtre — passez sur LinkedIn, votre audience y est déjà.
+
+## 3 bis. Les emplacements trouvés, avec ce qui est chiffrable
+
+Recherchés ce jour dans les kits tarifaires publics et les estimations de courtiers. Un prix
+d'estimation n'est pas un devis : la colonne le dit. Cinq lignes suffisent à décider, parce que
+le panier est de 499 € par mois (PRIVATE OFFICE : 1 500 €).
+
+| emplacement | ce que le public y fait | prix trouvé | ce que ça doit rapporter |
+| --- | --- | --- | --- |
+| LinkedIn — formulaire de prospect, France/Benelux | lit, clique, laisse un e-mail professionnel | 5,20 $ le clic, 88 $ le prospect (moyenne mesurée) | 12 prospects par 1 200 € ≈ 2 conversations |
+| Robb Report — page simple, éditions internationales | le magazine du cadeau à 40 000 € | **9 000 $** (open page, édition Arabie, tirage 30 000, 11 n°/an, tarif public) | 1 PRIVATE OFFICE signé couvre l'annonce |
+| Robb Report — demi-page ou page (courtier) | idem, marché américain | 6 000 $ / 8 500 $ (Skyad, tarifs annoncés) ; 27 862 $ pour une page en estimation tierce | crédibilité pour la vente, pas de la vente |
+| Robb Report &amp; sister titles — numérique | 11 M de pages vues/mois, 3,4 M de visiteurs uniques (médias PMC, chiffres éditeur) | à demander au régiste | un placement contexte-riche, mesure par UTM |
+| Elite Traveler — page imprimée | clients aviation privée | 41 405 $ (estimation tierce) | non, pas à ce stade |
+| Campden / Family Office Association, SFO Alliance | réunions fermées, sponsors tolérés avec règles de vente strictes | adhésion + sponsor : devis | 3 rendez-vous, pas 3 000 clics |
+| La presse des banques privées (UBS, J. P. Morgan Private Bank, Goldman Family Office, Northern Trust, BNY, Morgan Stanley) | **c'est là que les family offices lisent vraiment** : mesure indépendante montre que ces six banques publient plus de contenu cité sur les questions de family office que toute la presse spécialisée réunie | sponsoring éditorial, devis | un article cosigné avec un cabinet d'avocats ou un family office existant |
+
+Deux lectures qui changent l'allocation du budget, et qui viennent de données, pas d'opinion :
+
+1. Sur les individus à 30 M$ et plus, la publicité numérique est classée **« très peu efficace »**
+   et la prospection à froid **« disqualifiante »** ; les canaux qui fonctionnent sont le
+   recommandation d'un pair, le réseau de conseils professionnels (avocats de succession, experts-comptables,
+   fiduciaires), les relations de family office, et la parole donnée dans un événement fermé —
+   LinkedIn y est utile comme **preuve d'existence**, pas comme machine à leads. Le produit se
+   vend donc d'abord à **l'employeur du personnel de maison** (le titre à cibler), pas au rich.
+2. Un placement à 9 000 $ dans une édition à 30 000 exemplaires est rationnel **uniquement**
+   comme acte de marque qui précède trois rendez-vous : à 499 € par mois, il faut 18 mois d'un
+   abonnement PRIORITY pour le payer ; à 1 500 €, un seul suffit. Tout ce qui est au-dessus de
+   ce prix-là est un achat de réputation, à faire quand la trésorerie le permet, jamais à appeler
+   de l'acquisition.
+
+Ce qui n'a **pas** de prix vérifiable publiquement — et que je ne vais pas inventer : les tarifs
+numériques PMC (Robb Report), les forfaits sponsor de Campden, les emplacements du FT How To Spend It,
+la publicité Bloomberg Wealth. Quatre e-mails à envoyer, réponse en 48 heures ; le modèle de message
+est en fin de document.
+
+## 3 ter. Le message à envoyer aux régies (à copier-coller)
+
+> Objet : VELORA — demande de kit tarifaire, presse familiale privée
+>
+> Nous lançons un logiciel de bureau privé pour familles multi-résidences : personnel, propriétés,
+> déplacements, budgets. Panier : 499 € et 1 500 € par mois, marché France / Suisse romande /
+> Luxembourg / Londres / Dubaï. Budget d'essai sur un trimestre : 4 500 €, en un ou deux placements
+> maximum.
+>
+> Merci de nous envoyer (1) votre kit tarifaire pour les trois prochains numéros, (2) le tirage
+> diffusé **payé** par pays, (3) ce que vous acceptez comme texte — nous ne promettons aucun
+> rendement et n'utilisons pas de témoignage client, (4) si un placement éditorial cosigné est
+> possible et à quel tarif. Nous ne cherchons pas de visibilité : nous cherchons trois rendez-vous
+> par trimestre.
+
+Ce mail fait le tri tout seul : une régie qui répond par un tarif d'impression sans tirage payé ni
+possibilité éditoriale n'a pas votre acheteur.
 
 ## Sources (chiffres 2026, vérifiés ce jour)
 

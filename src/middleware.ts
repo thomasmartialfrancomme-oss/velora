@@ -11,6 +11,10 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/token';
+import { CAMPAIGN_COOKIE, campaignFromUrl, encodeCampaign } from '@/lib/marketing/attribution';
+
+/** 30 days: long enough for a household decision, short enough not to stalk. */
+const CAMPAIGN_TTL = 30 * 24 * 60 * 60;
 
 const PROTECTED = [
   '/dashboard',
@@ -60,6 +64,16 @@ export async function middleware(request: NextRequest) {
     if (process.env.NODE_ENV === 'production') {
       // Defence in depth alongside next.config headers().
       response.headers.set('X-Content-Type-Options', 'nosniff');
+    }
+    // A paid landing carries its own account statement in the URL. Freeze it here,
+    // on the first page view, because the conversion happens on another URL later.
+    if (!isApi && request.method === 'GET') {
+      const campaign = campaignFromUrl(request.nextUrl);
+      if (campaign) {
+        response.cookies.set(CAMPAIGN_COOKIE, encodeCampaign(campaign), {
+          path: '/', maxAge: CAMPAIGN_TTL, httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production',
+        });
+      }
     }
     return response;
   };

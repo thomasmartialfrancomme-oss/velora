@@ -13,7 +13,17 @@ export const PATCH = api({
   auth: 'admin',
   schema: adminAccessRequestSchema,
   handler: ({ user, params, body }) => {
-    const row = getDb().get<{ id: string; email: string }>(`SELECT id, email FROM access_requests WHERE id = @id`, { id: params.id });
+    const row = getDb().get<{
+      id: string;
+      email: string;
+      utm_source: string | null;
+      utm_medium: string | null;
+      utm_campaign: string | null;
+      utm_content: string | null;
+    }>(
+      `SELECT id, email, utm_source, utm_medium, utm_campaign, utm_content FROM access_requests WHERE id = @id`,
+      { id: params.id },
+    );
     if (!row) return fail(404, 'not_found', 'That request does not exist.');
     const patch = body as { status: 'new' | 'reviewing' | 'invited' | 'declined' | 'archived'; reviewerNote?: string | null };
     updateAccessRequest(params.id, patch.status, patch.reviewerNote ?? null);
@@ -29,9 +39,22 @@ export const PATCH = api({
       const token = randomToken(24);
       if (!existing) {
         db.run(
-          `INSERT INTO users (id, email, password_hash, first_name, last_name, role, status, country, timezone, locale, currency, briefing_time, notifications_json, created_at, updated_at)
-           VALUES (@id, @email, @hash, 'VELORA', 'Invite', 'owner', 'invited', NULL, 'Europe/Paris', 'en-GB', 'EUR', '07:00', '{}', @ts, @ts)`,
-          { id: newId('usr'), email: row.email.toLowerCase(), hash: `unusable:${token}`, ts: nowIso() },
+          `INSERT INTO users (id, email, password_hash, first_name, last_name, role, status, country, timezone, locale, currency, briefing_time, notifications_json,
+                              utm_source, utm_medium, utm_campaign, utm_content, created_at, updated_at)
+           VALUES (@id, @email, @hash, 'VELORA', 'Invite', 'owner', 'invited', NULL, 'Europe/Paris', 'en-GB', 'EUR', '07:00', '{}',
+                   @utm_source, @utm_medium, @utm_campaign, @utm_content, @ts, @ts)`,
+          {
+            id: newId('usr'),
+            email: row.email.toLowerCase(),
+            hash: `unusable:${token}`,
+            // The advert that produced this request keeps paying for as long as the
+            // account it created is quoted — the campaign follows the applicant in.
+            utm_source: row.utm_source,
+            utm_medium: row.utm_medium,
+            utm_campaign: row.utm_campaign,
+            utm_content: row.utm_content,
+            ts: nowIso(),
+          },
         );
       }
       db.run(

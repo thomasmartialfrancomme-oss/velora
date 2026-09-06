@@ -22,9 +22,15 @@ export default async function AdminAccessRequestsPage({ searchParams }: { search
   const status = typeof searchParams?.status === 'string' ? searchParams.status : 'open';
 
   const all = adminAccessRequests('all');
-  const rows = (status === 'all' ? all : all.filter((row) => row.status === status)).sort(
-    (a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  // "Needs a decision" is not a state a row can hold — it is the name for the two
+  // states that still require one. Matching the literal 'open' returned nothing, so
+  // the queue rendered "no one is waiting" beside a header reading four awaiting a
+  // first read: the default view of the intake queue was permanently empty.
+  const OPEN_STATES = ['new', 'reviewing'];
+  const visible = all.filter((row) =>
+    status === 'all' ? true : status === 'open' ? OPEN_STATES.includes(row.status) : row.status === status,
   );
+  const rows = visible.sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const countOf = (value: string) => all.filter((row) => row.status === value).length;
 
@@ -103,6 +109,7 @@ export default async function AdminAccessRequestsPage({ searchParams }: { search
                     { label: 'Residences', value: `${row.residences}` },
                     { label: 'Primary need', value: humanise(row.primaryRequirement, STATUS_LABEL) },
                     { label: 'Heard of us', value: row.referrer || '—' },
+                    { label: 'Paid campaign', value: row.campaign || 'organic / direct' },
                     { label: 'Submitted', value: formatDateTime(row.createdAt, admin.timezone) },
                   ].map((entry) => (
                     <div key={entry.label}>

@@ -19,7 +19,18 @@ export function readSchema(cwd = path.resolve(here, '..')) {
  * `ADD COLUMN IF NOT EXISTS`, so each is checked against table_info first —
  * that keeps an existing database current without a rebuild.
  */
-const COLUMN_PATCHES = [{ table: 'documents', column: 'stored_path', ddl: 'ALTER TABLE documents ADD COLUMN stored_path TEXT' }];
+const CAMPAIGN_COLUMNS = (table) =>
+  ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'].map((column) => ({
+    table,
+    column,
+    ddl: `ALTER TABLE ${table} ADD COLUMN ${column} TEXT`,
+  }));
+
+const COLUMN_PATCHES = [
+  { table: 'documents', column: 'stored_path', ddl: 'ALTER TABLE documents ADD COLUMN stored_path TEXT' },
+  ...CAMPAIGN_COLUMNS('users'),
+  ...CAMPAIGN_COLUMNS('access_requests'),
+];
 
 export function applySchema(db, cwd) {
   db.pragma('journal_mode = WAL');

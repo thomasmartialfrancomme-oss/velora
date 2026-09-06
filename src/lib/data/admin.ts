@@ -184,6 +184,9 @@ export function adminAccessRequests(status?: string) {
       status: String(row.status ?? 'new'),
       reviewerNote: (row.reviewer_note as string) ?? null,
       referrer: (row.referrer as string) ?? null,
+      // Paid traffic is only worth buying when the person reviewing the request can
+      // see which advert produced it. Null means "came here on their own".
+      campaign: row.utm_source ? [row.utm_source, row.utm_medium, row.utm_campaign].filter(Boolean).join(' · ') : null,
       createdAt: String(row.created_at ?? ''),
     }));
   return rows;

@@ -11,6 +11,8 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getDb, audit, nowIso } from '@/lib/db';
+import type { Campaign } from '@/lib/marketing/attribution';
+import { campaignColumns } from '@/lib/marketing/attribution';
 import { SESSION_COOKIE, signSessionToken, verifySessionToken, type Role, type SessionClaims } from '@/lib/auth/token';
 import { hashPassword } from '@/lib/auth/password';
 import { fromBcp47, LOCALE_COOKIE } from '@/lib/i18n/locales';
@@ -217,14 +219,17 @@ export async function createUser(input: {
   role?: Role;
   country?: string | null;
   timezone?: string;
+  campaign?: Campaign | null;
 }): Promise<string> {
   const db = getDb();
   const id = `usr_${cryptoRandom()}`;
   const ts = nowIso();
   db.run(
     `INSERT INTO users (id, email, password_hash, first_name, last_name, role, status, country,
-                        timezone, locale, currency, avatar_initials, briefing_time, notifications_json, created_at, updated_at)
-     VALUES (@id, @email, @hash, @first, @last, @role, 'active', @country, @tz, 'en-GB', 'EUR', @initials, '07:00', @notif, @ts, @ts)`,
+                        timezone, locale, currency, avatar_initials, briefing_time, notifications_json,
+                        utm_source, utm_medium, utm_campaign, utm_content, created_at, updated_at)
+     VALUES (@id, @email, @hash, @first, @last, @role, 'active', @country, @tz, 'en-GB', 'EUR', @initials, '07:00', @notif,
+             @utm_source, @utm_medium, @utm_campaign, @utm_content, @ts, @ts)`,
     {
       id,
       email: input.email.toLowerCase(),
@@ -236,6 +241,7 @@ export async function createUser(input: {
       tz: input.timezone ?? 'Europe/Paris',
       initials: `${input.firstName[0] ?? ''}${input.lastName[0] ?? ''}`.toUpperCase(),
       notif: JSON.stringify({ daily_briefing: true, property_alerts: true, travel_updates: true, channel: 'in_app' }),
+      ...campaignColumns(input.campaign ?? null),
       ts,
     },
   );

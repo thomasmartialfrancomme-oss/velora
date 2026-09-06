@@ -14,6 +14,7 @@ import { accessRequestSchema } from '@/lib/validation/schemas';
 import { getDb, audit, newId, nowIso } from '@/lib/db';
 import { clientIp, consume, hashIp } from '@/lib/http/security';
 import { fail, toErrorResponse } from '@/lib/http/responses';
+import { campaignColumns, campaignFromRequest } from '@/lib/marketing/attribution';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,8 +47,10 @@ export async function POST(request: Request) {
 
     const ts = nowIso();
     db.run(
-      `INSERT INTO access_requests (id, first_name, last_name, email, country, residences, primary_requirement, message, referrer, status, created_at, updated_at)
-       VALUES (@id, @first, @last, @email, @country, @residences, @requirement, @message, @referrer, 'new', @ts, @ts)`,
+      `INSERT INTO access_requests (id, first_name, last_name, email, country, residences, primary_requirement, message, referrer,
+                                   utm_source, utm_medium, utm_campaign, utm_content, status, created_at, updated_at)
+       VALUES (@id, @first, @last, @email, @country, @residences, @requirement, @message, @referrer,
+               @utm_source, @utm_medium, @utm_campaign, @utm_content, 'new', @ts, @ts)`,
       {
         id: newId('areq'),
         first: data.firstName,
@@ -58,6 +61,7 @@ export async function POST(request: Request) {
         requirement: data.primaryRequirement,
         message: data.message ?? null,
         referrer: request.headers.get('referer')?.slice(0, 200) ?? 'direct',
+        ...campaignColumns(campaignFromRequest(request)),
         ts,
       },
     );

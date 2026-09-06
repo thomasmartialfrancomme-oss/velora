@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS users (
   notifications_json TEXT NOT NULL DEFAULT '{}',
   sessions_revoked_at TEXT,          -- JWTs issued before this instant are dead
   last_login_at       TEXT,
+  utm_source          TEXT,          -- frozen at sign-up from the landing's cookie
+  utm_medium          TEXT,
+  utm_campaign        TEXT,
+  utm_content         TEXT,
   created_at          TEXT NOT NULL,
   updated_at          TEXT NOT NULL
 );
@@ -324,6 +328,10 @@ CREATE TABLE IF NOT EXISTS access_requests (
   primary_requirement TEXT NOT NULL,
   message             TEXT,
   referrer            TEXT,
+  utm_source          TEXT,
+  utm_medium          TEXT,
+  utm_campaign        TEXT,
+  utm_content         TEXT,
   status              TEXT NOT NULL DEFAULT 'new'
                         CHECK (status IN ('new','reviewing','invited','declined','archived')),
   reviewer_note       TEXT,
