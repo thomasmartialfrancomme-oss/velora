@@ -109,8 +109,20 @@ export function methodPolicy(list?: string): MethodPolicy {
 }
 
 /** `payment_method_types` for a Checkout session, in the order the payer sees them. */
+/**
+ * The rails that may appear on a **subscription-mode Checkout session**.
+ *
+ * Measured against the live API on this account (2026-09-06), not from memory:
+ *  • `bank_transfer` is not a valid `payment_method_types` value for Checkout at all —
+ *    Stripe answers `Invalid payment_method_types[0]: must be one of card, acss_debit, …`;
+ *  • `pay_by_bank` exists but `cannot be used in subscription mode`;
+ *  • a transfer is initiated by the payer, so it cannot attach a mandate either.
+ * A transfer therefore belongs to the invoice path (`transferInvoice`, `POST
+ * /v1/subscriptions` with `payment_settings.payment_method_types`), where the value *is*
+ * legal — and offering it here turned every « Adhérer » click into a 500.
+ */
 export function checkoutMethodTypes(policy = methodPolicy()): string[] {
-  return policy.enabled.map((method) => method.stripeType);
+  return policy.enabled.filter((method) => method.kind !== 'transfer').map((method) => method.stripeType);
 }
 
 /** `payment_method_options`, merged from whatever the enabled rails need. */

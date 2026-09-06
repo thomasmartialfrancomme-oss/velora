@@ -8,7 +8,7 @@
  * is present in the environment. No key is shipped with this repository.
  */
 import { billingRuntime } from '@/lib/billing/runtime';
-import { stripeRequest } from '@/lib/billing/stripe-api';
+import { intentKey, StripeError, stripeRequest, type FormValue } from '@/lib/billing/stripe-api';
 import { canSellMonthly, checkoutMethodOptions, checkoutMethodTypes, methodPolicy, methodsSummary } from '@/lib/billing/methods';
 import { getPlan, type MembershipPlan, type PlanKey } from '@/lib/utils/format';
 import { getDb, newId, nowIso } from '@/lib/db';
@@ -251,14 +251,15 @@ class StripeBilling implements BillingProvider {
     );
     if (existing?.provider_customer_id) return existing.provider_customer_id;
 
+    const customerBody = {
+      email: ctx.email,
+      ...(ctx.fullName ? { name: ctx.fullName } : {}),
+      metadata: { veloraUserId: ctx.actor.id },
+    };
     const created = await stripeRequest<{ id: string }>('/v1/customers', {
       secret: this.key,
-      idempotencyKey: `velora-customer-${ctx.actor.id}`,
-      params: {
-        email: ctx.email,
-        ...(ctx.fullName ? { name: ctx.fullName } : {}),
-        metadata: { veloraUserId: ctx.actor.id },
-      },
+      idempotencyKey: intentKey(`velora-customer-${ctx.actor.id}`, customerBody),
+      params: customerBody,
     });
     db.run(`UPDATE subscriptions SET provider_customer_id = @customerId, provider = 'stripe', updated_at = @ts WHERE user_id = @userId`, {
       customerId: created.id,
@@ -306,10 +307,7 @@ class StripeBilling implements BillingProvider {
     const types = checkoutMethodTypes(policy);
     const options = checkoutMethodOptions(policy);
 
-    const session = await stripeRequest<{ url?: string | null; id?: string }>('/v1/checkout/sessions', {
-      secret: this.key,
-      idempotencyKey: `velora-checkout-${ctx.actor.id}-${ctx.plan.key}-${ctx.billingCycle}`,
-      params: {
+    const sessionBody: { [key: string]: FormValue } = {
         mode: 'subscription',
         client_reference_id: ctx.actor.id,
         customer_email: ctx.email,
@@ -329,8 +327,42 @@ class StripeBilling implements BillingProvider {
         allow_promotion_codes: false,
         success_url: `${ctx.appUrl}/membership?status=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${ctx.appUrl}/membership?status=cancelled`,
-      },
-    });
+      };
+
+    // Deux cas où la clé ne peut pas être rejouée telle quelle : un Stripe qui a gardé en
+    // mémoire l'ancienne tentative (jusqu'à 24 h après une mise à jour des rails ou du prix),
+    // et un session rejouée qui a depuis expiré — lien mort pour le membre. Une seconde
+    // tentative avec une clé neuve, pas de boucle.
+    let session: { url?: string | null; id?: string; status?: string } | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      // Deuxième tentative : on retire notre liste de moyens de paiement. Un compte en euros
+      // refuse `us_bank_account` et `bacs_debit`, un compte en couronnes refuserait iDEAL — la
+      // compatibilité dépend de la devise et du compte, pas de nous, et laisser Stripe choisir
+      // ses propres méthodes éligibles vaut mieux qu'un 500 sur le bouton d'adhésion.
+      const body: { [key: string]: FormValue } = {};
+      if (attempt === 0) Object.assign(body, sessionBody);
+      else for (const [field, value] of Object.entries(sessionBody)) if (!field.startsWith('payment_method_')) body[field] = value;
+      const key = attempt === 0 ? intentKey(`velora-checkout-${ctx.actor.id}-${ctx.plan.key}-${ctx.billingCycle}`, sessionBody) : `velora-checkout-${ctx.actor.id}-${Date.now()}-retry`;
+      try {
+        const created = await stripeRequest<{ url?: string | null; id?: string; status?: string }>('/v1/checkout/sessions', {
+          secret: this.key,
+          idempotencyKey: key,
+          params: body,
+        });
+        if (created.url && created.status !== 'expired') {
+          session = created;
+          break;
+        }
+        if (attempt === 1) {
+          session = created;
+          break;
+        }
+      } catch (err) {
+        if (err instanceof StripeError && attempt === 0 && (/idempot/i.test(err.message) || /payment_method_(types|options)/.test(err.message))) continue;
+        throw err;
+      }
+    }
+    if (!session) throw new StripeError(502, 'checkout_unavailable', 'Stripe did not return a payment page. Try again in a moment.');
     if (!session.url) throw new ConstraintError('Stripe did not return a checkout URL.');
     return {
       url: session.url,
@@ -361,7 +393,7 @@ class StripeBilling implements BillingProvider {
     const types = Array.from(new Set(policy.enabled.map((method) => method.stripeType)));
     const subscription = await stripeRequest<{ latest_invoice?: string | { id?: string } | null }>('/v1/subscriptions', {
       secret: this.key,
-      idempotencyKey: `velora-transfer-${ctx.actor.id}-${ctx.plan.key}`,
+      idempotencyKey: intentKey(`velora-transfer-${ctx.actor.id}-${ctx.plan.key}`, { customer, cycle: ctx.billingCycle }),
       params: {
         customer,
         items: [this.lineItem(ctx.plan, 'annual')],

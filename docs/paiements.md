@@ -129,7 +129,7 @@ Si un membre annule, la coupure est demandée chez Stripe (`DELETE /v1/subscript
 `invoice_now`) puis reflétée localement ; l'état local n'est jamais la source de vérité du
 contrat, c'est le miroir — et le webhook est la seule chose qui puisse l'écrire.
 
-## 5. Ce que `npm run check:stripe` prouve, sans compte Stripe (71 contrôles)
+## 5. Ce que `npm run check:stripe` prouve, sans compte Stripe (73 contrôles)
 Quatre regles de Stripe sont verifiees par le harnais parce qu'elles ont ete mesurees sur le
 compte reel, pas devinees : `GET /v1/prices?lookup_keys[0]=` (il n'existe pas de route
 `/v1/prices/lookup`), les vrais noms de capacites (`card_payments`, `sepa_debit_payments`, …) lus

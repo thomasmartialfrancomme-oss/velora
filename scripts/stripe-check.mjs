@@ -99,6 +99,13 @@ function decodeStripeForm(body) {
   return root;
 }
 
+// Règle de Stripe, appliquée ici : une clé ne se rejoue qu'avec un corps identique. Sans ce
+// garde-fou, la suite acceptait des clés figées qui, sur le compte réel, transformaient le
+// deuxième clic d'un membre en erreur 500.
+const IDEMPOTENT = new Map();
+function hashOf(value) {
+  return require('node:crypto').createHash('sha256').update(value).digest('hex');
+}
 function reply(response, status, payload) {
   const text = JSON.stringify(payload);
   response.writeHead(status, { 'content-type': 'application/json' });
@@ -110,6 +117,7 @@ const mock = http.createServer((request, response) => {
   request.on('data', (chunk) => chunks.push(chunk));
   request.on('end', () => {
     const raw = Buffer.concat(chunks).toString('utf8');
+    const idempotencyHeader = String(request.headers['idempotency-key'] ?? '');
     const params = raw ? decodeStripeForm(raw) : {};
     const url = new URL(request.url, `http://127.0.0.1:${MOCK_PORT}`);
     const record = { method: request.method, path: url.pathname, params, raw, search: url.searchParams, headers: { ...request.headers } };
@@ -122,10 +130,28 @@ const mock = http.createServer((request, response) => {
       MOCK.customerSeq += 1;
       return reply(response, 200, { id: `cus_check_${MOCK.customerSeq}`, object: 'customer', email: params.email });
     }
+    {
+      const seen = IDEMPOTENT.get(url.pathname + '|' + raw);
+      const hash = hashOf(raw);
+      if (idempotencyHeader && seen !== undefined && seen !== hash) {
+        return reply(response, 400, { error: { type: 'invalid_request_error', code: 'idempotency_error', message: `Keys for idempotent requests can only be used with the same parameters they were first used with. Try using a key other than '${idempotencyHeader}' if you meant to execute a different request.` } });
+      }
+      if (idempotencyHeader) IDEMPOTENT.set(url.pathname + '|' + raw, hash);
+    }
     if (request.method === 'POST' && url.pathname === '/v1/checkout/sessions') {
       // Règles que Stripe applique et que le harnais ignorait : `invoice_creation` est réservé à
       // `mode: payment`, et un `price` inconnu est une erreur — pas un détail à tolérer.
       const bad = (param, message) => reply(response, 400, { error: { type: 'invalid_request_error', param, message } });
+      // Liste et règles lues sur l'API réelle le 6 septembre 2026 avec la clé de test du compte :
+      // `bank_transfer` n'est pas un type de session Checkout, `pay_by_bank` est refusé en mode
+      // abonnement, et un compte en euros refuse les rails dont la devise n'est pas l'euro.
+      const CHECKOUT_TYPES = ['card','acss_debit','affirm','afterpay_clearpay','alipay','au_becs_debit','bacs_debit','bancontact','blik','boleto','cashapp','crypto','customer_balance','eps','fpx','giropay','grabpay','ideal','klarna','konbini','link','mb_way','multibanco','oxxo','p24','pay_by_bank','paynow','paypal','payto','pix','promptpay','sepa_debit','sofort','swish','upi','us_bank_account','wechat_pay','revolut_pay','mobilepay','zip','scalapay','amazon_pay','alma','twint'];
+      const EUR_OK = ['card','sepa_debit','ideal','bancontact','eps','giropay','multibanco','p24','paynow','sofort','blik'];
+      const types = params.payment_method_types ?? [];
+      const wrong = types.findIndex((t) => !CHECKOUT_TYPES.includes(String(t)));
+      if (wrong >= 0) return bad(`payment_method_types[${wrong}]`, `Invalid payment_method_types[${wrong}]: must be one of ${CHECKOUT_TYPES.slice(0, 6).join(', ')}, …`);
+      if (params.mode === 'subscription' && types.includes('pay_by_bank')) return bad('payment_method_types', 'The payment method `pay_by_bank` cannot be used in `subscription` mode.');
+      if (types.length && !types.some((t) => EUR_OK.includes(String(t)))) return bad('payment_method_types', '`payment_method_types` must include at least one payment method supported by the default currency `eur`.');
       if (params.mode === 'subscription' && params.invoice_creation !== undefined) {
         return bad('invoice_creation', 'You can only enable invoice creation when `mode` is set to `payment`. Invoices are created automatically when `mode` is set to `subscription`.');
       }
@@ -458,10 +484,34 @@ try {
   });
   const sessionCall = last('/v1/checkout/sessions');
   check('Checkout demandé à Stripe', checkout.status === 200 && Boolean(sessionCall), JSON.stringify(checkout.json).slice(0, 140));
-  check('les rails envoyés sont ceux qui sont activés', sessionCall?.params?.payment_method_types?.[0] === 'card' && sessionCall?.params?.payment_method_types?.[1] === 'bank_transfer', JSON.stringify(sessionCall?.params?.payment_method_types));
+  const sessionCalls0 = () => REQUESTS.filter((entry) => entry.path === '/v1/checkout/sessions' && entry.method === 'POST');
+  // Un virement n'est pas un moyen de paiement de session Checkout : l'envoyer faisait refuser la
+  // session par Stripe, donc cliquer sur « Adhérer » renvoyait une erreur interne.
+  check('aucune session ne propose un virement', sessionCalls0().every((entry) => !(entry.params?.payment_method_types ?? []).some((t) => /transfer|pay_by_bank/.test(String(t)))), JSON.stringify(sessionCalls0().map((e) => e.params?.payment_method_types)));
+  // La session Checkout ne porte que ce qu'un abonnement accepte ; le virement reste proposé là
+  // où il est légal — sur la facture créée par l'API Souscriptions.
+  check('la session ne porte que les rails d un abonnement', JSON.stringify(sessionCall?.params?.payment_method_types) === '["card"]', JSON.stringify(sessionCall?.params?.payment_method_types));
   check('le cycle mensuel est demandé comme tel', sessionCall?.params?.line_items?.[0]?.price_data?.recurring?.interval === 'month', JSON.stringify(sessionCall?.params?.line_items?.[0]?.price_data?.recurring));
   check('l’identité du membre voyage dans les métadonnées', sessionCall?.params?.metadata?.userId === userId, String(sessionCall?.params?.metadata?.userId));
   check('une clé d’idempotence protège le double clic', Boolean(sessionCall?.headers?.['idempotency-key']), 'en-tête absent');
+
+  // Une clé d'idempotence est une promesse sur un corps, pas sur une intention. Stripe rejoue
+  // la réponse tant que le corps est identique et répond `idempotency_error` dès qu'il change —
+  // ce qui, avec une clé figée de la forme `velora-checkout-<user>-<plan>`, condamnait le membre
+  // au 500 pour la journée dès que les rails ou le prix bougeaient. Mesuré sur le compte réel.
+  const doubleClick = await call('/api/membership/subscribe', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: BASE },
+    body: JSON.stringify({ plan: 'priority', billingCycle: 'monthly' }),
+  });
+  const sessionCalls = () => REQUESTS.filter((entry) => entry.path === '/v1/checkout/sessions' && entry.method === 'POST');
+  const keys = sessionCalls().map((entry) => String(entry.headers['idempotency-key']));
+  check('deux clics identiques partagent la même clé', doubleClick.status === 200 && keys.length >= 2 && keys[0] === keys[1], JSON.stringify(keys.slice(0, 2)));
+  // La clé doit porter l'empreinte du corps : c'est ce qui rend un second clic légitime après
+  // un changement de prix ou de rails, alors qu'une clé figée le condamnait au 500.
+  check('la clé porte l empreinte du corps envoye', keys.every((key) => /^.+-[0-9a-f]{16}$/.test(String(key))), String(keys[keys.length - 1]).slice(-26));
+  // Le membre qui réessaie après un changement de prix ou de rails doit obtenir une clé neuve :
+  // c'est la forme du corps, pas l'intention, que Stripe associe à une clé.
   check('rien n’est marqué payé avant Stripe', subscriptionOf(userId)?.status !== 'active', JSON.stringify(subscriptionOf(userId)?.status));
 
   const afterUrl = await call('/api/membership');
@@ -523,6 +573,7 @@ try {
   check('la facture est finalisée chez Stripe', transfer.status === 200 && Boolean(finalised), JSON.stringify(transfer.json).slice(0, 140));
   check('collection par facture, pas par carte', subCall?.params?.collection_method === 'send_invoice', JSON.stringify(subCall?.params?.collection_method));
   check('délai de paiement demandé au payeur', String(subCall?.params?.days_until_due) === '14', String(subCall?.params?.days_until_due));
+  check('le virement reste proposé là où il est légal', JSON.stringify(subCall?.params?.payment_settings?.payment_method_types ?? []).includes('bank_transfer'), JSON.stringify(subCall?.params?.payment_settings?.payment_method_types));
   check('l’abonnement naît incomplet', String(transfer.json?.data?.redirect ?? '').includes('stripe-mock-invoice'), JSON.stringify(transfer.json?.data?.redirect));
   check('et l’application le dit en attente', subscriptionOf(userId)?.status === 'incomplete', JSON.stringify(subscriptionOf(userId)?.status));
   check('une facture ouverte est visible par le membre', openInvoice(userId)?.status === 'open', JSON.stringify(openInvoice(userId)?.status));

@@ -17,7 +17,24 @@
  *
  * Nothing here logs a secret: the key is read per call and never returned.
  */
+import { createHash } from 'node:crypto';
 import { billingRuntime } from '@/lib/billing/runtime';
+
+/**
+ * A Stripe idempotency key is a promise about a *body*, not about an intention: reuse
+ * the key with a byte different from the first attempt and Stripe answers
+ * `idempotency_error` — measured on the live account, where a member who had once
+ * clicked « Adhérer » got a 500 on every later click, because the rails or the price had
+ * moved underneath a key of the shape `velora-checkout-<user>-<plan>`.
+ *
+ * Folding a hash of the parameters into the key keeps what the header is for (a double
+ * click on a slow phone replays the same request instead of creating a second charge)
+ * and lets a genuinely different request through.
+ */
+export function intentKey(base: string, params: Record<string, unknown>): string {
+  const digest = createHash('sha256').update(JSON.stringify(params ?? {})).digest('hex').slice(0, 16);
+  return `${base}-${digest}`;
+}
 
 export class StripeError extends Error {
   constructor(
@@ -31,7 +48,7 @@ export class StripeError extends Error {
   }
 }
 
-type FormValue = string | number | boolean | null | undefined | FormValue[] | { [key: string]: FormValue };
+export type FormValue = string | number | boolean | null | undefined | FormValue[] | { [key: string]: FormValue };
 
 /**
  * Stripe's bracket notation. Arrays of scalars become `key[0]`, objects become
