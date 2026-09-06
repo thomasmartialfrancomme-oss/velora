@@ -117,12 +117,27 @@ export function methodPolicy(list?: string): MethodPolicy {
  *    Stripe answers `Invalid payment_method_types[0]: must be one of card, acss_debit, …`;
  *  • `pay_by_bank` exists but `cannot be used in subscription mode`;
  *  • a transfer is initiated by the payer, so it cannot attach a mandate either.
- * A transfer therefore belongs to the invoice path (`transferInvoice`, `POST
- * /v1/subscriptions` with `payment_settings.payment_method_types`), where the value *is*
- * legal — and offering it here turned every « Adhérer » click into a 500.
+ * A transfer therefore belongs to the invoice path (`invoiceMethodTypes`), where the value
+ * *is* legal — and offering it here turned every « Adhérer » click into a 500. One-shot
+ * redirect rails (BLIK, Swish) are excluded for the same reason measured the same way:
+ * `The payment method \`blik\` cannot be used in \`subscription\` mode`, which also produced
+ * a 500, on the account whose approved rails are Card, Bancontact, BLIK and Bank transfer.
  */
 export function checkoutMethodTypes(policy = methodPolicy()): string[] {
-  return policy.enabled.filter((method) => method.kind !== 'transfer').map((method) => method.stripeType);
+  return policy.enabled.filter((method) => method.recurring && method.kind !== 'transfer').map((method) => method.stripeType);
+}
+
+/**
+ * The rails an invoice-paid subscription may list in `payment_settings`.
+ *
+ * Not the same set: here a transfer is legal (it is how the invoice gets paid) and a
+ * one-shot redirect rail is not — BLIK and Swish cannot be attached to a subscription,
+ * so naming them makes Stripe refuse the whole creation. `recurring` alone would drop
+ * the transfer; `kind !== 'transfer'` alone would keep BLIK. Measured on the live
+ * account, where the invoice path had to keep working after the Checkout list was fixed.
+ */
+export function invoiceMethodTypes(policy = methodPolicy()): string[] {
+  return policy.enabled.filter((method) => method.kind !== 'redirect').map((method) => method.stripeType);
 }
 
 /** `payment_method_options`, merged from whatever the enabled rails need. */

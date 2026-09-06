@@ -151,6 +151,11 @@ const mock = http.createServer((request, response) => {
       const wrong = types.findIndex((t) => !CHECKOUT_TYPES.includes(String(t)));
       if (wrong >= 0) return bad(`payment_method_types[${wrong}]`, `Invalid payment_method_types[${wrong}]: must be one of ${CHECKOUT_TYPES.slice(0, 6).join(', ')}, …`);
       if (params.mode === 'subscription' && types.includes('pay_by_bank')) return bad('payment_method_types', 'The payment method `pay_by_bank` cannot be used in `subscription` mode.');
+      // Un rail qui ne peut pas porter de renouvellement est refusé en mode abonnement — mesuré
+      // avec BLIK sur le compte réel, où il produisait exactement le 500 que la suite ne voyait pas.
+      const SUBSCRIPTION_OK = ['card', 'sepa_debit', 'us_bank_account', 'bacs_debit', 'acss_debit', 'ideal', 'bancontact', 'link', 'mobilepay', 'twint', 'satispay'];
+      const oneShot = types.find((t) => !SUBSCRIPTION_OK.includes(String(t)));
+      if (params.mode === 'subscription' && oneShot) return bad('payment_method_types', `The payment method \`${oneShot}\` cannot be used in \`subscription\` mode.`);
       if (types.length && !types.some((t) => EUR_OK.includes(String(t)))) return bad('payment_method_types', '`payment_method_types` must include at least one payment method supported by the default currency `eur`.');
       if (params.mode === 'subscription' && params.invoice_creation !== undefined) {
         return bad('invoice_creation', 'You can only enable invoice creation when `mode` is set to `payment`. Invoices are created automatically when `mode` is set to `subscription`.');
@@ -171,6 +176,14 @@ const mock = http.createServer((request, response) => {
       });
     }
     if (request.method === 'POST' && url.pathname === '/v1/subscriptions') {
+      {
+        const INVOICE_OK = ['card', 'us_bank_account', 'sepa_debit', 'bacs_debit', 'acss_debit', 'bank_transfer'];
+        const listed = params.payment_settings?.payment_method_types ?? [];
+        const bad2 = listed.find((t) => !INVOICE_OK.includes(String(t)));
+        if (bad2) {
+          return reply(response, 400, { error: { type: 'invalid_request_error', param: 'payment_settings[payment_method_types]', message: `You cannot use \`${bad2}\` as a payment method on a subscription with \`collection_method: send_invoice\`.` } });
+        }
+      }
       MOCK.subSeq += 1;
       MOCK.invoiceSeq += 1;
       return reply(response, 200, {

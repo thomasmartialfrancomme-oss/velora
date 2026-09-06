@@ -194,10 +194,12 @@ Deux limites sont volontairement laisses ouvertes, pour ne pas fabriquer un etat
   sur un etat pending que rien ne nettoyage — Stripe na pas ete ecoute pour `checkout.session.expired`,
   et lajouter pour effacer une ligne ne vaut pas le risque dun faux negatif. Le plan affiche
   change au moment ou Stripe confirme, en general en quelques secondes.
-- **changer un role deconnecte la personne concernee.** Le role voyage dans le jeton de session ;
-  la promotion dun membre vers la console revoque donc ses sessions (comme la suspension le faisait
-  deja) et la reponse porte `requiresRelogin`. Sans cela, la personne promue reste sur un jeton qui
-  dit lancien role et croit, a juste titre, que la console lignore.
+- **la promotion vers la console prend effet sans reconnexion.** Le role est relu sur la ligne
+  `users` a chaque requete (`loadUserByClaims`), donc pas besoin de revequer les sessions ; une
+  tentative de le faire par un `UPDATE … sessions_revoked_at = now` a ete retiree le 6 septembre
+  apres mesure : le jeton est granulaire a la seconde, et une session emise dans la meme seconde se
+  serait trouvee invalidee — `revokeAllSessions()` existe justement pour arrondir au debut de la
+  seconde suivante.
 ## 7. Sans clé, que se passe-t-il ?
 
 Le produit tourne : l'adhésion s'enregistre dans la base locale, l'écran annonce « aucune clé de

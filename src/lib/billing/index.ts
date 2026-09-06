@@ -9,7 +9,7 @@
  */
 import { billingRuntime } from '@/lib/billing/runtime';
 import { intentKey, StripeError, stripeRequest, type FormValue } from '@/lib/billing/stripe-api';
-import { canSellMonthly, checkoutMethodOptions, checkoutMethodTypes, methodPolicy, methodsSummary } from '@/lib/billing/methods';
+import { canSellMonthly, checkoutMethodOptions, checkoutMethodTypes, invoiceMethodTypes, methodPolicy, methodsSummary } from '@/lib/billing/methods';
 import { getPlan, type MembershipPlan, type PlanKey } from '@/lib/utils/format';
 import { getDb, newId, nowIso } from '@/lib/db';
 import { ConstraintError } from '@/lib/errors';
@@ -358,7 +358,7 @@ class StripeBilling implements BillingProvider {
           break;
         }
       } catch (err) {
-        if (err instanceof StripeError && attempt === 0 && (/idempot/i.test(err.message) || /payment_method_(types|options)/.test(err.message))) continue;
+        if (err instanceof StripeError && attempt === 0 && (/idempot/i.test(err.message) || /payment.?method/i.test(err.message))) continue;
         throw err;
       }
     }
@@ -390,7 +390,7 @@ class StripeBilling implements BillingProvider {
     }
 
     const customer = await this.customerId(ctx);
-    const types = Array.from(new Set(policy.enabled.map((method) => method.stripeType)));
+    const types = Array.from(new Set(invoiceMethodTypes(policy)));
     const subscription = await stripeRequest<{ latest_invoice?: string | { id?: string } | null }>('/v1/subscriptions', {
       secret: this.key,
       idempotencyKey: intentKey(`velora-transfer-${ctx.actor.id}-${ctx.plan.key}`, { customer, cycle: ctx.billingCycle }),
