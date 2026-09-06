@@ -107,10 +107,14 @@ de test — c'est écrit dans le composant, pas dans un commentaire.
 ## 4. Comment l'argent arrive chez vous
 
 Stripe encaisse sur le solde de **votre** compte (le compte connecté à la clé), puis verse sur
-**votre** compte bancaire selon le calendrier de votre plan Stripe — en France, cartes : généralement
-J+1 à J+2 ouvrés ; SEPA : idem ; **virement : quand votre banque le reçoit**, et la facture reste
-`open` jusqu'à ce que Stripe le confirme (c'est l'événement `invoice.paid` qui active
-l'abonnement). Aucun argent ne transite par votre hébergeur, par la base de données, ni par le
+**votre** compte bancaire selon le calendrier réglé dans votre tableau de bord. Les délais ne sont
+pas symétriques et c'est de la trésorerie, pas du détail : le **prélèvement SEPA met 6 jours ouvrés**
+à rendre les fonds disponibles (Stripe a allongé ce délai en 2026 pour distinguer un échec de
+prélèvement d'un litige), un **virement arrive quand votre banque le reçoit** — et la facture reste
+`open` jusqu'à ce que Stripe le confirme (c'est l'événement `invoice.paid` qui active l'abonnement) ;
+le délai de règlement des cartes est une caractéristique de votre compte, lisible dans
+*Stripe → Soldes*, et le **premier versement d'un compte neuf est typiquement retenu 7 à 14 jours**.
+Le §8 reprend ces chiffres avec leur source et les montants nets par tarif. Aucun argent ne transite par votre hébergeur, par la base de données, ni par le
 navigateur de vos membres : aucune donnée de carte, aucun token, aucun IBAN n'est stocké ici —
 les seules colonnes chez vous sont un montant, une devise, un numéro de facture, une date et un
 lien vers la facture hébergée par Stripe.
@@ -162,3 +166,46 @@ Le produit tourne : l'adhésion s'enregistre dans la base locale, l'écran annon
 paiement branchée, aucun prélèvement », la facture est créée `open` et marquée « démonstration,
 impayée ». C'est exactement ce que la suite de 48 contrôles valide en continu, et c'est ce qui fait
 qu'on ne peut pas confondre une démo avec de l'argent.
+
+## 8. Ce que chaque paiement coûte vraiment (taux vérifiés le 6 septembre 2026)
+
+Source : page tarifs publique de Stripe France, relue le jour où ce document a été écrit. Ce sont
+les taux de **l'offre standard** ; un compte à volume important peut être en tarification
+personnalisée ou IC+, auquel cas le seul chiffre qui compte est celui affiché dans
+*Stripe → Paramètres → Tarifs*. Le produit, lui, n'invente aucun taux : il lit les capacités du
+compte et ne vend que ce que Stripe a réellement approuvé.
+
+| Ce que paie le client | Ce que Stripe prend |
+| --- | --- |
+| Carte standard EEE | 1,5 % + 0,25 € |
+| Carte premium EEE (Visa Signature, World Mastercard — le cas le plus fréquent dans cette clientèle) | 2,8 % + 0,25 € |
+| Carte britannique | 2,5 % + 0,25 € |
+| Carte hors EEE | 3,15 % + 0,25 €, et + 2 % si conversion de devise |
+| **Prélèvement SEPA** | **0,35 € par débit, sans pourcentage** |
+| Virement (facture annuelle) | 0,4 % par facture payée (Invoicing) |
+| Abonnement, quel que soit le moyen | + 0,7 % du volume (Billing) |
+| Litige reçu | 20 € ; 20 € de plus pour le contester à la main (remboursés si gagné) ; Smart Disputes : 30 % du montant si gagné |
+| Stripe Tax | 0,45 € par transaction via l'API, ou 0,5 % en no-code |
+
+Sur les six tarifs du produit, net dans votre poche (hors TVA, donc à recalculer si Stripe Tax est
+activé, car le pourcentage porte alors sur le total TTC) :
+
+| Tarif | Brut | Carte standard | Carte premium | Prélèvement SEPA | Virement |
+| --- | --- | --- | --- | --- | --- |
+| 199 € / mois | 199 | 194,37 | 191,78 | **197,26** | — |
+| 499 € / mois | 499 | 487,77 | 481,29 | **495,16** | — |
+| 1 500 € / mois | 1 500 | 1 466,75 | 1 447,25 | **1 489,15** | — |
+| 199 € annuel | 2 149,20 | 2 101,67 | 2 073,73 | **2 133,81** | 2 125,56 |
+| 499 € annuel | 5 269,44 | 5 153,26 | 5 084,76 | **5 232,20** | 5 211,48 |
+| 1 500 € annuel | 18 000 | 17 603,75 | 17 369,75 | **17 873,65** | 17 802,00 |
+
+La lecture qui compte : **pousser le prélèvement SEPA plutôt que la carte premium économise
+41,90 € par mois sur un abonné à 1 500 €**, soit 503 € par an et par foyer, et 296 € d'écart sur
+une année à 18 000 €. Un prélèvement qui échoue remonte au produit en quelques jours par webhook,
+et c'est ce déclencheur là qui alimente les relances et l'écran de reprise — pas une supposition.
+
+Délais d'encaissement, eux aussi relus à la source : premier versement d'un compte neuf **7 à 14
+jours après le premier paiement réel** (Stripe vérifie identité et activité), puis selon le
+calendrier choisi ; **SEPA : 6 jours ouvrés** avant que les fonds soient disponibles. Un membre est
+actif dans le produit dès le webhook, donc l'accès est livré avant que l'argent soit disponible — à
+prévoir en trésorerie sur les abonnements annuels.
