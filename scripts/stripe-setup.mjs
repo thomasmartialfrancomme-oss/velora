@@ -140,17 +140,33 @@ for (const plan of plans) {
 }
 
 console.log('\n— portail client —');
+// La forme exacte a été vérifiée contre un compte réel : `return_urls` n'existe pas sur ce
+// endpoint (c'est `default_return_url`), et `features[subscription_update][enabled]=true`
+// exige la liste des produits — d'où false ci-dessous, la formule se change sur le site.
+const PORTAL_NAME = 'VELORA membership';
 const portal = await call(
   'POST',
   '/v1/billing_portal/configurations',
   {
-    name: 'VELORA membership',
+    name: PORTAL_NAME,
+    'business_profile[headline]': 'Velora — gestion de votre adhésion',
+    'business_profile[privacy_policy_url]': `${DOMAIN}/privacy`,
+    'business_profile[terms_of_service_url]': `${DOMAIN}/terms`,
+    'default_return_url': `${DOMAIN}/membership`,
     'features[invoice_history][enabled]': 'true',
-    'features[subscription_cancel][enabled]': 'true',
-    'features[subscription_update][enabled]': 'false',
+    'features[payment_method_update][enabled]': 'true',
     'features[customer_update][enabled]': 'true',
-    'features[customer_update][allowed_updates][]': 'email',
-    'return_urls[0]': `${DOMAIN}/membership`,
+    'features[customer_update][allowed_updates][0]': 'name',
+    'features[customer_update][allowed_updates][1]': 'email',
+    'features[customer_update][allowed_updates][2]': 'address',
+    'features[subscription_cancel][enabled]': 'true',
+    'features[subscription_cancel][mode]': 'at_period_end',
+    'features[subscription_cancel][proration_behavior]': 'none',
+    'features[subscription_cancel][cancellation_reason][enabled]': 'true',
+    'features[subscription_cancel][cancellation_reason][options][0]': 'too_expensive',
+    'features[subscription_cancel][cancellation_reason][options][1]': 'switched_service',
+    'features[subscription_cancel][cancellation_reason][options][2]': 'unused',
+    'features[subscription_cancel][cancellation_reason][options][3]': 'other',
   },
   'portail client',
   'velora-portal-configuration',
@@ -166,8 +182,15 @@ if (flag('no-webhook')) {
     '/v1/webhook_endpoints',
     {
       url: `${DOMAIN}/api/billing/webhook`,
-      'enabled_events[]': 'checkout.session.completed,invoice.paid,invoice.payment_failed,invoice.upcoming,customer.subscription.updated,customer.subscription.deleted',
-      'api_version': '',
+      // Les sept événements que /api/billing/webhook sait traiter, un par élément de tableau —
+      // une liste séparée par des virgules dans une seule clé n'en fait qu'un seul nom invalide.
+      'enabled_events[0]': 'checkout.session.completed',
+      'enabled_events[1]': 'customer.subscription.created',
+      'enabled_events[2]': 'customer.subscription.updated',
+      'enabled_events[3]': 'customer.subscription.deleted',
+      'enabled_events[4]': 'invoice.paid',
+      'enabled_events[5]': 'invoice.payment_failed',
+      'enabled_events[6]': 'payment_intent.payment_failed',
       description: 'VELORA PRIVATE — membership state',
     },
     'abonnement aux événements',

@@ -280,15 +280,32 @@ export async function connectStripeAccount(options: ConnectOptions): Promise<Con
         idempotencyKey: 'velora-portal-configuration',
         params: {
           name: portalName,
-          business_profile: { url: env.appUrl },
+          // Forme vérifiée contre le compte réel (API 2026-07-29.dahlia), champ par champ, avec
+          // zéro retrait nécessaire. Trois noms que j'y avais mis n'existent pas : `url` dans
+          // business_profile, `after_completion`, et `subscription_update` en entier — ce dernier
+          // exige la liste des produits, dont l'encodage a changé entre deux versions (`products`
+          // puis `products_and_prices`, les deux refusés sur ce compte). Une écriture fragilisée
+          // n'a rien à faire dans un chemin d'argent : le membre change donc de formule depuis
+          // /membership, et le portail lui laisse voir ses factures, changer sa carte, corriger
+          // ses coordonnées et annuler à l'échéance.
+          default_return_url: `${env.appUrl}/membership`,
+          business_profile: {
+            headline: 'Velora — gestion de votre adhésion',
+            privacy_policy_url: `${env.appUrl}/privacy`,
+            terms_of_service_url: `${env.appUrl}/terms`,
+          },
           features: {
             invoice_history: { enabled: true },
             payment_method_update: { enabled: true },
-            customer_update: { enabled: true, allowed_updates: ['name', 'address'] },
-            subscription_update: {
+            customer_update: { enabled: true, allowed_updates: ['name', 'email', 'address'] },
+            subscription_cancel: {
               enabled: true,
-              default_payment_method: 'available',
-              after_completion: { behavior: 'return' },
+              mode: 'at_period_end',
+              proration_behavior: 'none',
+              cancellation_reason: {
+                enabled: true,
+                options: ['too_expensive', 'switched_service', 'unused', 'other'],
+              },
             },
           },
         },

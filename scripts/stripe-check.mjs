@@ -181,12 +181,34 @@ const mock = http.createServer((request, response) => {
       return reply(response, 200, row);
     }
     if (request.method === 'POST' && url.pathname === '/v1/billing_portal/configurations') {
+      // Validation à la Stripe : ces noms n'existent pas sur ce endpoint, et le portail refuse
+      // d'activer le changement d'abonnement sans la liste des produits. Un fixture qui laisse
+      // passer n'importe quoi est ce qui m'a laissé publier trois champs imaginaires.
+      const refuse = (name) => reply(response, 400, { error: { type: 'invalid_request_error', param: name, message: `Received unknown parameter: ${name}.` } });
+      const missing = (name) => reply(response, 400, { error: { type: 'invalid_request_error', param: name, code: 'parameter_missing', message: `Missing required param: ${name}.` } });
+      if (params.return_urls !== undefined) return refuse('return_urls');
+      const bp = params.business_profile ?? {};
+      if (bp.url !== undefined) return refuse('business_profile[url]');
+      const su = params.features?.subscription_update ?? {};
+      if (su.after_completion !== undefined) return refuse('features[subscription_update][after_completion]');
+      if (su.default_payment_method !== undefined) return refuse('features[subscription_update][default_payment_method]');
+      // encodeStripeForm envoie les booléens en chaînes : le corps reçu est du formulaire, pas du JS.
+      const suOn = su.enabled === true || su.enabled === 'true';
+      if (suOn && !(Array.isArray(su.products) || Array.isArray(su.products_and_prices))) return missing('features[subscription_update][products]');
       const name = String(params.name ?? '');
       let id = MOCK.portal.get(name);
       if (!id) { id = `bpc_check_${MOCK.portal.size + 1}`; MOCK.portal.set(name, id); }
       return reply(response, 200, { id, object: 'billing_portal.configuration', name });
     }
     if (request.method === 'POST' && url.pathname === '/v1/webhook_endpoints') {
+      const KNOWN = ['checkout.session.completed', 'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid', 'invoice.payment_failed', 'payment_intent.payment_failed', 'invoice.upcoming'];
+      const events = params.enabled_events;
+      if (!Array.isArray(events) || !events.length) {
+        return reply(response, 400, { error: { type: 'invalid_request_error', param: 'enabled_events', message: 'Invalid array: enabled_events must be a list of event names, one per element.' } });
+      }
+      const inconnu = events.find((e) => !KNOWN.includes(String(e)));
+      if (inconnu) return reply(response, 400, { error: { type: 'invalid_request_error', param: 'enabled_events', message: `No such event: '${inconnu}'` } });
+      if (params.api_version === '') return reply(response, 400, { error: { type: 'invalid_request_error', param: 'api_version', message: 'Invalid value for api_version: expected a valid Stripe API version.' } });
       const id = `we_check_${MOCK.endpoints.length + 1}`;
       // un secret n'est montré qu'à la création : c'est ce qui rend le câblage
       // possible en une fois, et ce qui oblige à le dire quand il existe déjà.
@@ -586,6 +608,11 @@ try {
   check('le webhook est créé sur la bonne URL avec sept événements', String(webhookCall?.params?.url) === `${BASE2}/api/billing/webhook` && (webhookCall?.params?.enabled_events ?? []).length === 7, JSON.stringify(webhookCall?.params?.enabled_events));
   check('chaque écriture porte une clé d’idempotence', [...REQUESTS].filter((entry) => entry.method === 'POST' && /^\/v1\/(prices|products|webhook_endpoints|billing_portal\/configurations)$/.test(entry.path)).every((entry) => entry.headers['idempotency-key']), 'écritures sans en-tête Idempotency-Key');
   check('le portail client est créé', Boolean(outcome?.portalCreated), JSON.stringify(outcome?.portalConfigurationId ?? outcome?.portalCreated));
+  const portalCall = [...REQUESTS].reverse().find((entry) => entry.path === '/v1/billing_portal/configurations' && entry.method === 'POST');
+  const pf = portalCall?.params?.features ?? {};
+  check('la configuration du portail ne contient aucun champ que Stripe ne connaît pas', portalCall?.params?.return_urls === undefined && portalCall?.params?.business_profile?.url === undefined && pf.subscription_update?.after_completion === undefined && pf.subscription_update?.default_payment_method === undefined, JSON.stringify({ bp: Object.keys(portalCall?.params?.business_profile ?? {}), su: Object.keys(pf.subscription_update ?? {}) }));
+  const on = (v) => v === true || v === 'true';
+  check('le portail laisse changer de carte, voir ses factures, annuler à l’échéance', on(pf.invoice_history?.enabled) && on(pf.payment_method_update?.enabled) && on(pf.subscription_cancel?.enabled) && pf.subscription_cancel?.mode === 'at_period_end', JSON.stringify(pf));
 
   const afterConnect = await (await fetch(`${BASE2}/api/health`)).json();
   const live = afterConnect.integrations.billing;
