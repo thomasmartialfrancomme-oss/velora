@@ -201,10 +201,14 @@ const mock = http.createServer((request, response) => {
         id: 'acct_check_1', object: 'account', country: 'FR',
         charges_enabled: true, details_submitted: true,
         business_profile: { name: 'Velora Test SARL' },
+        // Les noms sont ceux que Stripe renvoie réellement (vérifiés sur un compte français :
+        // `card_payments`, pas `card`). Un fixture qui reprend mes hypothèses ne teste rien.
         capabilities: {
-          card: { status: 'active' },
+          card_payments: { status: 'active' },
           sepa_debit_payments: { status: 'active' },
-          bank_transfers: { status: 'inactive' },
+          bancontact_payments: { status: 'active' },
+          transfers: { status: 'inactive' },
+          bank_transfer_payments: { status: 'inactive' },
           ideal_payments: { status: 'pending' },
         },
       });
@@ -587,6 +591,7 @@ try {
   const live = afterConnect.integrations.billing;
   check('l’application facture désormais chez Stripe', live.provider === 'stripe' && live.mode === 'test' && live.source === 'admin', JSON.stringify({ p: live.provider, m: live.mode, s: live.source }));
   check('les rails suivent ce que le compte a obtenu', /Card/.test(live.methodsSummary) && /SEPA/.test(live.methodsSummary) && !/ransfer/.test(live.methodsSummary), live.methodsSummary);
+  check('la carte est reconnue par card_payments, pas par un nom inventé', /Card/.test(live.methodsSummary) && /Bancontact/.test(live.methodsSummary), live.methodsSummary);
   check('le virement est retiré de la vente, pas cassé', live.transferAvailable === false && live.monthlyAvailable === true, JSON.stringify({ t: live.transferAvailable, m: live.monthlyAvailable }));
   check('les prix stockés rendent les trois plans vendables', live.pricesComplete === true && live.pricesConfigured === 6, JSON.stringify({ c: live.pricesConfigured, ok: live.pricesComplete }));
 

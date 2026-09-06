@@ -79,17 +79,28 @@ const WEBHOOK_EVENTS = [
   'payment_intent.payment_failed',
 ];
 
-/** Rails this product can sell with, and the capability name Stripe uses for them. */
-const RAILS: { id: string; capability: string }[] = [
-  { id: 'card', capability: 'card' },
-  { id: 'sepa_debit', capability: 'sepa_debit_payments' },
-  { id: 'us_bank_account', capability: 'us_bank_ach_debit_payments' },
-  { id: 'bacs_debit', capability: 'gb_bacs_debit_payments' },
-  { id: 'ideal', capability: 'ideal_payments' },
-  { id: 'bancontact', capability: 'bancontact_payments' },
-  { id: 'blik', capability: 'blik_payments' },
-  { id: 'swish', capability: 'swish_payments' },
-  { id: 'bank_transfer', capability: 'bank_transfers' },
+/**
+ * Rails this product can sell with, and the capability names Stripe uses for them.
+ *
+ * Measured against a live French account, not from memory — and the difference matters:
+ * asking for a capability that does not exist never errors, it simply reads as "not active",
+ * so every wrong name below would silently remove a working payment method from the sale.
+ * The card rail is `card_payments`, not `card`; ACH is `us_bank_account_ach_payments`; BACS is
+ * `bacs_debit_payments`; bank transfer answers under `transfers` on older accounts and
+ * `bank_transfer_payments` on newer ones, hence the lists. A capability the account has never
+ * been offered (Swish on a French account, say) is absent from the response, which is the same
+ * answer as "not active" and is handled the same way.
+ */
+const RAILS: { id: string; capability: string[] }[] = [
+  { id: 'card', capability: ['card_payments'] },
+  { id: 'sepa_debit', capability: ['sepa_debit_payments'] },
+  { id: 'us_bank_account', capability: ['us_bank_account_ach_payments'] },
+  { id: 'bacs_debit', capability: ['bacs_debit_payments'] },
+  { id: 'ideal', capability: ['ideal_payments'] },
+  { id: 'bancontact', capability: ['bancontact_payments'] },
+  { id: 'blik', capability: ['blik_payments'] },
+  { id: 'swish', capability: ['swish_payments'] },
+  { id: 'bank_transfer', capability: ['transfers', 'bank_transfer_payments'] },
 ];
 
 /** The catalogue is the source of the amounts; a connection can therefore never invent a price. */
@@ -213,7 +224,9 @@ export async function connectStripeAccount(options: ConnectOptions): Promise<Con
   const account = await stripeRequest<StripeAccount>('/v1/account', { secret, method: 'GET' });
   if (!account.id) throw new StripeError(502, 'bad_account', 'Stripe answered without naming an account, so nothing was changed.');
 
-  const approved = RAILS.filter((rail) => account.capabilities?.[rail.capability]?.status === 'active').map((rail) => rail.id);
+  const isApproved = (rail: { capability: string[] }) =>
+    rail.capability.some((name) => account.capabilities?.[name]?.status === 'active');
+  const approved = RAILS.filter(isApproved).map((rail) => rail.id);
   const notApproved = RAILS.filter((rail) => !approved.includes(rail.id)).map((rail) => rail.id);
   const paymentMethods = (options.paymentMethods ?? (approved.length ? approved.join(',') : 'card')).trim();
 
