@@ -72,7 +72,7 @@ export default async function MembershipPage({ searchParams }: { searchParams?: 
           </p>
         </Reveal>
 
-        <PlanMatrix signedIn={Boolean(user)} currentPlan={subscription?.plan ?? null} stripeConfigured={billing.stripeConfigured} initialPlan={requested} />
+        <PlanMatrix signedIn={Boolean(user)} currentPlan={subscription?.plan ?? null} stripeConfigured={billing.stripeConfigured} billing={billing} initialPlan={requested} />
       </Section>
 
       {user && subscription ? (

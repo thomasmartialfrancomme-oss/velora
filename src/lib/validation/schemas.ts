@@ -389,6 +389,12 @@ export const accessRequestSchema = z.object({
 export const membershipActionSchema = z.object({
   plan: enumOf(['private', 'priority', 'private_office'] as const),
   billingCycle: enumOf(['monthly', 'annual'] as const).default('monthly'),
+  /**
+   * `checkout` is Stripe's hosted page (card and anything else the operator
+   * enabled). `transfer` opens an invoice with a due date instead — a transfer is
+   * initiated by the payer, so it can only ever pay a period in advance.
+   */
+  method: enumOf(['checkout', 'transfer'] as const).default('checkout'),
 });
 
 export const ticketSchema = z.object({

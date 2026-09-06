@@ -42,7 +42,7 @@ dans le navigateur ; les routes sensibles exigent l'en-tête `Origin`.
 
 | service | variable | comportement sans clé |
 | --- | --- | --- |
-| Stripe (abonnements) | `STRIPE_SECRET_KEY`, `STRIPE_PRICE_*`, `STRIPE_WEBHOOK_SECRET` | écran d'adhésion explicite « démonstration », aucun faux paiement |
+| Stripe (abonnements) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, 6 × `STRIPE_PRICE_<PLAN>_<CYCLE>`, `VELORA_PAYMENT_METHODS` | écran d'adhésion explicite « démonstration », aucun faux paiement — voir **`docs/paiements.md`** (carte, virement, prélèvement, `node scripts/stripe-setup.mjs`) |
 | IA (brouillons de notes, priorisation) | `VELORA_AI_KEY` (et `VELORA_AI_PROVIDER`, `VELORA_AI_MODEL`) | réponses marquées démonstration |
 | Courriel (invitations, notes du matin) | `VELORA_SMTP_*` | journalisé dans la sortie du serveur |
 | Cartes (fonds cartographiques) | `NEXT_PUBLIC_MAPBOX_TOKEN` | planches de coordonnées, sans tuiles |

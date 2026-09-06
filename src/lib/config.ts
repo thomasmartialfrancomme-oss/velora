@@ -25,6 +25,15 @@ export function assertProductionSecret(): void {
   }
 }
 
+const stripePriceIds: Record<string, string> = {};
+for (const planKey of ['private', 'priority', 'private_office'] as const) {
+  for (const cycle of ['monthly', 'annual'] as const) {
+    const prefixed = process.env[`STRIPE_PRICE_${planKey.toUpperCase()}_${cycle.toUpperCase()}`] ?? '';
+    const legacy = cycle === 'monthly' ? process.env[`STRIPE_PRICE_${planKey.toUpperCase()}`] ?? '' : '';
+    stripePriceIds[`${planKey}:${cycle}`] = prefixed || legacy;
+  }
+}
+
 export const env = {
   appName: 'VELORA PRIVATE',
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
@@ -54,11 +63,23 @@ export const env = {
   billing: {
     stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
-    priceIds: {
-      private: process.env.STRIPE_PRICE_PRIVATE ?? '',
-      priority: process.env.STRIPE_PRICE_PRIORITY ?? '',
-      private_office: process.env.STRIPE_PRICE_PRIVATE_OFFICE ?? '',
-    },
+    /** How a household may pay. Card only until you widen it deliberately. */
+    paymentMethods: process.env.VELORA_PAYMENT_METHODS ?? 'card',
+    /** Days a payer gets to settle an invoice by transfer before it is overdue. */
+    transferDueDays: Math.min(60, Math.max(1, Number(process.env.VELORA_TRANSFER_DUE_DAYS ?? 14))),
+    /** Empty means "Stripe's current default for this account" — pinning a stale
+     *  version is worse than not asking for one. */
+    apiVersion: process.env.VELORA_STRIPE_API_VERSION ?? '',
+    /** Override for tests only (the local harness speaks the same protocol). */
+    apiBase: process.env.STRIPE_API_BASE ?? 'https://api.stripe.com',
+    /**
+     * `STRIPE_PRICE_<PLAN>_<CYCLE>`. A price carries its own interval, so a plan
+     * needs two of them: one id shared between monthly and annual would charge the
+     * monthly figure once a year, or the yearly figure every month. The bare
+     * `STRIPE_PRICE_<PLAN>` is still read, as the monthly price, so a deployment
+     * that sells one cycle is not broken by this.
+     */
+    priceIds: stripePriceIds,
   },
   dbPath: process.env.VELORA_DB_PATH ?? path.join(process.cwd(), 'data', 'velora.db'),
 } as const;

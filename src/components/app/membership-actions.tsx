@@ -27,20 +27,36 @@ function messageFor(caught: unknown): string {
 
 /* ============================================================ plan matrix */
 
+/** The public half of `getBillingStatus()` — no key, no secret, only what a buyer may know. */
+export interface BillingChoices {
+  stripeConfigured: boolean;
+  mode?: string;
+  methods?: { id: string; label: string; recurring: boolean; kind: string }[];
+  methodsSummary?: string;
+  monthlyAvailable?: boolean;
+  transferAvailable?: boolean;
+  transferDueDays?: number;
+}
+
 export function PlanMatrix({
   signedIn,
   currentPlan,
   stripeConfigured,
   initialPlan,
+  billing,
 }: {
   signedIn: boolean;
   currentPlan: string | null;
   stripeConfigured: boolean;
   initialPlan?: string;
+  billing?: BillingChoices;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [cycle, setCycle] = useState<Cycle>('monthly');
+  const [payBy, setPayBy] = useState<'checkout' | 'transfer'>('checkout');
+  const transferOffered = Boolean(billing?.transferAvailable);
+  const cardLabels = (billing?.methods ?? []).filter((method) => method.kind !== 'transfer').map((method) => method.label);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'attention'; text: string } | null>(null);
 
@@ -53,7 +69,10 @@ export function PlanMatrix({
     setBusy(key);
     setNotice(null);
     try {
-      const data = await apiRequest<Intent>('/api/membership/subscribe', { method: 'POST', body: { plan: key, billingCycle: cycle } });
+      const data = await apiRequest<Intent>('/api/membership/subscribe', {
+        method: 'POST',
+        body: { plan: key, billingCycle: cycle, method: cycle === 'annual' && transferOffered ? payBy : 'checkout' },
+      });
       if (data?.redirect && /^https?:\/\//.test(data.redirect)) {
         window.location.assign(data.redirect);
         return;
@@ -77,7 +96,12 @@ export function PlanMatrix({
               key={option}
               type="button"
               aria-pressed={cycle === option}
-              onClick={() => setCycle(option)}
+              onClick={() => {
+                setCycle(option);
+                // A monthly plan is charged again by itself. A transfer cannot be,
+                // so the choice is taken away rather than left to fail on submit.
+                if (option === 'monthly') setPayBy('checkout');
+              }}
               className={cn(
                 'h-8 rounded-[3px] px-4 text-[10.5px] uppercase tracking-[0.2em] transition-all duration-300 ease-lux',
                 cycle === option ? 'bg-ivory-100 text-ink-1000' : 'text-graphite-300 hover:text-ivory-100',
@@ -87,8 +111,43 @@ export function PlanMatrix({
             </button>
           ))}
         </div>
+        {transferOffered ? (
+          <div
+            className="inline-flex items-center gap-1 rounded-[4px] border border-ivory-200/[0.09] bg-ink-950/60 p-1"
+            role="group"
+            aria-label="How to pay"
+          >
+            <button
+              type="button"
+              aria-pressed={payBy === 'checkout'}
+              onClick={() => setPayBy('checkout')}
+              className={cn(
+                'h-8 rounded-[3px] px-4 text-[10.5px] uppercase tracking-[0.2em] transition-all duration-300 ease-lux',
+                payBy === 'checkout' ? 'bg-ivory-100 text-ink-1000' : 'text-graphite-300 hover:text-ivory-100',
+              )}
+            >
+              {[...cardLabels, 'Stripe Checkout'].filter(Boolean).slice(0, 2).join(' · ') || 'Card'}
+            </button>
+            <button
+              type="button"
+              aria-pressed={payBy === 'transfer'}
+              disabled={cycle !== 'annual'}
+              title={cycle !== 'annual' ? 'A transfer pays one period in advance, so it is offered on the annual plan only.' : undefined}
+              onClick={() => setPayBy(cycle === 'annual' ? 'transfer' : 'checkout')}
+              className={cn(
+                'h-8 rounded-[3px] px-4 text-[10.5px] uppercase tracking-[0.2em] transition-all duration-300 ease-lux',
+                payBy === 'transfer' && cycle === 'annual' ? 'bg-ivory-100 text-ink-1000' : 'text-graphite-300 hover:text-ivory-100',
+                cycle !== 'annual' && 'cursor-not-allowed opacity-40 hover:text-graphite-300',
+              )}
+            >
+              Bank transfer · {billing?.transferDueDays ?? 14} days
+            </button>
+          </div>
+        ) : null}
         <p className="text-[11px] uppercase tracking-[0.18em] text-graphite-500">
-          {stripeConfigured ? 'Stripe keys detected · real checkout' : 'No payment provider connected · no card, no charge'}
+          {stripeConfigured
+            ? `Stripe ${billing?.mode === 'live' ? 'live' : 'test'} · paid by ${billing?.methodsSummary || 'card'}`
+            : 'No payment provider connected · no card, no charge'}
         </p>
         <p className="text-[11.5px] text-graphite-500">
           Annual billing is priced per plan: {MEMBERSHIP_PLANS.filter((entry) => entry.annual_discount_pct > 0).map((entry) => `${entry.name} ${entry.annual_discount_pct}%`).join(' · ')}

@@ -17,11 +17,12 @@
     "db:sql": "node --no-warnings scripts/db-cli.mjs sql",
     "check": "npm run typecheck && npm run db:verify",
     "check:attribution": "node scripts/attribution-check.mjs",
-"smoke": "node --no-warnings scripts/smoke.mjs",
+    "smoke": "node --no-warnings scripts/smoke.mjs",
     "db:prepare": "node --no-warnings scripts/prepare-runtime.mjs",
     "i18n:extract": "node scripts/i18n.mjs extract",
     "i18n:coverage": "node scripts/i18n.mjs coverage",
-    "i18n:missing": "node scripts/i18n.mjs missing"
+    "i18n:missing": "node scripts/i18n.mjs missing",
+    "check:stripe": "node scripts/stripe-check.mjs"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

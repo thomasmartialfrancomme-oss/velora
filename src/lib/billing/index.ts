@@ -8,6 +8,8 @@
  * is present in the environment. No key is shipped with this repository.
  */
 import { env } from '@/lib/config';
+import { stripeRequest } from '@/lib/billing/stripe-api';
+import { canSellMonthly, checkoutMethodOptions, checkoutMethodTypes, methodPolicy, methodsSummary } from '@/lib/billing/methods';
 import { getPlan, type MembershipPlan, type PlanKey } from '@/lib/utils/format';
 import { getDb, newId, nowIso } from '@/lib/db';
 import { ConstraintError } from '@/lib/errors';
@@ -36,6 +38,11 @@ export interface BillingProvider {
   readonly label: string;
   readonly configured: boolean;
   checkout(ctx: BillingContext): Promise<BillingIntent>;
+  /**
+   * The annual plan paid by transfer: an invoice with a due date, because a
+   * transfer is initiated by the payer and can never be re-collected at renewal.
+   */
+  transferInvoice(ctx: BillingContext): Promise<BillingIntent>;
   portal(ctx: { actor: Actor; email: string; appUrl: string }): Promise<BillingIntent>;
 }
 
@@ -48,17 +55,74 @@ export function amountForPlan(plan: MembershipPlan, cycle: 'monthly' | 'annual')
 }
 
 export function getBillingStatus() {
+  const configured = env.capabilities.stripeConfigured;
+  const policy = methodPolicy();
+  const secret = env.billing.stripeSecretKey;
   return {
-    provider: env.capabilities.stripeConfigured ? ('stripe' as const) : ('demo' as const),
-    stripeConfigured: env.capabilities.stripeConfigured,
-    label: env.capabilities.stripeConfigured ? 'Stripe · live keys detected' : 'Demo billing · no payment provider connected',
-    note: env.capabilities.stripeConfigured
-      ? 'Checkout and the customer portal redirect to Stripe. Webhook handling is at /api/billing/webhook.'
+    provider: configured ? ('stripe' as const) : ('demo' as const),
+    stripeConfigured: configured,
+    label: configured ? 'Stripe · keys detected' : 'Demo billing · no payment provider connected',
+    /** sk_test_ and sk_live_ are not decoration: a test key can never settle money. */
+    mode: !configured ? 'demo' : secret.startsWith('sk_live_') ? 'live' : secret.startsWith('sk_test_') ? 'test' : 'unknown',
+    note: configured
+      ? 'Checkout, the customer portal and the invoice for a transfer all run against Stripe. Webhook handling is at /api/billing/webhook.'
       : 'Subscriptions are recorded in the platform database. Nothing is charged. Set STRIPE_SECRET_KEY to switch on real billing.',
+    methods: policy.enabled.map((method) => ({ id: method.id, label: method.label, recurring: method.recurring, kind: method.kind })),
+    methodsSummary: methodsSummary(policy),
+    monthlyAvailable: canSellMonthly(policy),
+    transferAvailable: policy.oneOff.some((method) => method.kind === 'transfer'),
+    transferDueDays: env.billing.transferDueDays,
+    /** names in VELORA_PAYMENT_METHODS this file does not know — reported, never swallowed */
+    unknownMethods: policy.unknown,
+    pricesConfigured: Object.values(env.billing.priceIds).filter(Boolean).length,
+    /** A plan with both prices present can be sold from the dashboard-less start. */
+    pricesComplete: ['private', 'priority', 'private_office'].every(
+      (key) => Boolean(env.billing.priceIds[`${key}:monthly`] && env.billing.priceIds[`${key}:annual`]),
+    ),
   };
 }
 
 /* ------------------------------------------------------------ providers */
+
+/**
+ * Write the mirror row for a Stripe-backed membership.
+ *
+ * An UPDATE alone would silently do nothing for a member who has never subscribed
+ * before — which is exactly the first sale, and exactly the case where a lost
+ * `provider_customer_id` means the next invoice is addressed to nobody.
+ */
+function upsertStripeSubscription(
+  userId: string,
+  fields: { plan: PlanKey; status: string; cycle: 'monthly' | 'annual'; amount: number; customer?: string | null; subscription?: string | null },
+) {
+  const db = getDb();
+  const updated = db.run(
+    `UPDATE subscriptions SET plan = @plan, status = @status, billing_cycle = @cycle, amount_cents = @amount,
+            provider = 'stripe', currency = 'EUR',
+            provider_customer_id = COALESCE(@customer, provider_customer_id),
+            provider_subscription_id = COALESCE(@subscription, provider_subscription_id), updated_at = @ts
+      WHERE user_id = @userId`,
+    { ...fields, customer: fields.customer ?? null, subscription: fields.subscription ?? null, ts: nowIso(), userId },
+  );
+  if (updated.changes) return;
+  db.run(
+    `INSERT INTO subscriptions (id, user_id, plan, status, billing_cycle, amount_cents, currency, provider,
+                                provider_customer_id, provider_subscription_id, started_at, updated_at)
+     VALUES (@id, @userId, @plan, @status, @cycle, @amount, 'EUR', 'stripe', @customer, @subscription, @ts, @ts)`,
+    {
+      id: newId('sub'),
+      userId,
+      plan: fields.plan,
+      status: fields.status,
+      cycle: fields.cycle,
+      amount: fields.amount,
+      customer: fields.customer ?? null,
+      subscription: fields.subscription ?? null,
+      ts: nowIso(),
+    },
+  );
+}
+
 
 class DemoBilling implements BillingProvider {
   readonly id = 'demo' as const;
@@ -125,110 +189,235 @@ class DemoBilling implements BillingProvider {
       message: 'Manage your plan here. Card details are held by the payment provider once one is connected.',
     };
   }
-}
 
-/** The slice of the Stripe SDK this file touches — typed locally to keep the package optional. */
-type StripeLike = {
-  checkout: { sessions: { create(params: Record<string, unknown>): Promise<{ url?: string | null; id?: string }> } };
-  billingPortal: { sessions: { create(params: Record<string, unknown>): Promise<{ url?: string | null; id?: string }> } };
-  customers: { create(params: Record<string, unknown>): Promise<{ id: string }> };
-  subscriptions: { cancel(id: string, params?: Record<string, unknown>): Promise<unknown> };
-  webhooks: { constructEvent(rawBody: string, signature: string, secret: string): unknown };
-};
-
-/**
- * `stripe` is deliberately NOT a dependency of this project: the platform must
- * boot and serve a full household with no payment provider installed. The
- * specifier is built at runtime and marked `webpackIgnore` so the bundler never
- * tries to resolve it at build time — otherwise `next build` fails on a missing
- * module. Callers that need real Stripe get a loud, actionable error instead.
- */
-export async function loadStripeConstructor(): Promise<new (secret: string, options: Record<string, unknown>) => StripeLike> {
-  try {
-    const specifier = 'stripe';
-    const loaded = (await import(/* webpackIgnore: true */ /* @vite-ignore */ specifier)) as {
-      default?: new (secret: string, options: Record<string, unknown>) => StripeLike;
+  /**
+   * Demonstration mode writes the state a transfer would write — an `incomplete`
+   * membership with one open invoice — so the screen a member reaches after paying
+   * by wire is the screen you can see today. What it does not do is pretend money
+   * moved: the invoice stays open.
+   */
+  async transferInvoice(ctx: BillingContext): Promise<BillingIntent> {
+    const intent = await this.checkout({ ...ctx, billingCycle: 'annual' });
+    getDb().run(`UPDATE subscriptions SET status = 'incomplete', updated_at = @ts WHERE user_id = @userId`, {
+      ts: nowIso(),
+      userId: ctx.actor.id,
+    });
+    return {
+      ...intent,
+      message: `An open invoice for the ${ctx.plan.name} year was recorded, marked unpaid — no payment provider is connected, so nothing was sent to a bank and nothing will be. Set STRIPE_SECRET_KEY and enable bank_transfer to receive real transfers.`,
     };
-    const Stripe = loaded.default;
-    if (typeof Stripe !== 'function') throw new Error('module has no constructor');
-    return Stripe;
-  } catch {
-    throw new ConstraintError('Stripe keys are present but the `stripe` package is not installed. Run: npm install stripe');
   }
 }
 
+/**
+ * Real money. Built on `fetch` rather than the `stripe` package on purpose: the
+ * platform must boot where optional dependencies are not installed, and a missing
+ * module used to turn a valid Stripe webhook into a 501 and a build into an error.
+ * `src/lib/billing/stripe-api.ts` holds the encoding and the signature scheme.
+ *
+ * Three rules this class never bends:
+ *  • the local state is written only from Stripe's answer or its webhook, never
+ *    from a browser saying "it worked";
+ *  • every creation call carries an idempotency key, so a double click on a slow
+ *    connection cannot open two customers;
+ *  • a plan whose money has not arrived is `incomplete`, not `active`.
+ */
 class StripeBilling implements BillingProvider {
   readonly id = 'stripe' as const;
   readonly label = 'Stripe';
   readonly configured = true;
 
-  private async client(): Promise<StripeLike> {
-    const key = env.billing.stripeSecretKey;
-    if (!key) throw new ConstraintError('STRIPE_SECRET_KEY is not set.');
-    const Stripe = await loadStripeConstructor();
-    return new Stripe(key, { apiVersion: '2024-06-20' });
+  private get key(): string {
+    if (!env.billing.stripeSecretKey) throw new ConstraintError('STRIPE_SECRET_KEY is not set, so no money can move.');
+    return env.billing.stripeSecretKey;
   }
 
-  async checkout(ctx: BillingContext): Promise<BillingIntent> {
-    const stripe = await this.client();
-    const priceId = ctx.plan.stripe_price_env ? env.billing.priceIds[ctx.plan.key] : '';
-    const lineItem = priceId
-      ? { price: priceId, quantity: 1 }
-      : {
-          price_data: {
-            currency: 'eur',
-            unit_amount: amountForPlan(ctx.plan, ctx.billingCycle),
-            product_data: { name: `VELORA ${ctx.plan.name}`, description: ctx.plan.positioning },
-          },
-          quantity: 1,
-        };
-
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer_email: ctx.email,
-      line_items: [lineItem],
-      subscription_data: ctx.billingCycle === 'annual' ? { trial_period_days: 14 } : undefined,
-      success_url: `${ctx.appUrl}/membership?status=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${ctx.appUrl}/membership?status=cancelled`,
-      metadata: { plan: ctx.plan.key, cycle: ctx.billingCycle, userId: ctx.actor.id },
-      payment_intent_data: { description: `VELORA ${ctx.plan.name} — ${ctx.billingCycle}` },
-    });
-    if (!session.url) throw new ConstraintError('Stripe did not return a checkout URL.');
-    return { url: session.url, provider: 'stripe', simulated: false, message: 'Redirecting to Stripe Checkout.' };
-  }
-
-  /** Used by immediate cancellation; only reachable when keys are configured. */
-  async cancelNow(providerSubscriptionId: string): Promise<void> {
-    const stripe = await this.client();
-    await stripe.subscriptions.cancel(providerSubscriptionId, { invoice_now: true });
-  }
-
-  async portal(ctx: { actor: Actor; email: string; appUrl: string }): Promise<BillingIntent> {
-    const stripe = await this.client();
+  /** The customer row every later call hangs off. Created once per member, then remembered. */
+  private async customerId(ctx: { actor: Actor; email: string; fullName?: string }): Promise<string> {
     const db = getDb();
     const existing = db.get<{ provider_customer_id: string | null }>(
       `SELECT provider_customer_id FROM subscriptions WHERE user_id = @userId LIMIT 1`,
       { userId: ctx.actor.id },
     );
-    let customerId = existing?.provider_customer_id ?? null;
-    if (!customerId) {
-      const customer = await stripe.customers.create({ email: ctx.email, metadata: { veloraUserId: ctx.actor.id } });
-      customerId = customer.id;
-      db.run(`UPDATE subscriptions SET provider_customer_id = @customerId, provider = 'stripe', updated_at = @ts WHERE user_id = @userId`, {
-        customerId,
-        ts: nowIso(),
-        userId: ctx.actor.id,
+    if (existing?.provider_customer_id) return existing.provider_customer_id;
+
+    const created = await stripeRequest<{ id: string }>('/v1/customers', {
+      secret: this.key,
+      idempotencyKey: `velora-customer-${ctx.actor.id}`,
+      params: {
+        email: ctx.email,
+        ...(ctx.fullName ? { name: ctx.fullName } : {}),
+        metadata: { veloraUserId: ctx.actor.id },
+      },
+    });
+    db.run(`UPDATE subscriptions SET provider_customer_id = @customerId, provider = 'stripe', updated_at = @ts WHERE user_id = @userId`, {
+      customerId: created.id,
+      ts: nowIso(),
+      userId: ctx.actor.id,
+    });
+    if (!db.get<{ id: string }>(`SELECT id FROM subscriptions WHERE user_id = @userId`, { userId: ctx.actor.id })) {
+      upsertStripeSubscription(ctx.actor.id, {
+        plan: 'private',
+        status: 'incomplete',
+        cycle: 'monthly',
+        amount: 0,
+        customer: created.id,
       });
     }
-    const session = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${ctx.appUrl}/membership`,
+    return created.id;
+  }
+
+  /**
+   * A configured price id is used when the operator ran the setup script; without
+   * one the price is carried inline, which is what makes the very first sale
+   * possible before anybody has touched a dashboard.
+   */
+  private lineItem(plan: MembershipPlan, cycle: 'monthly' | 'annual') {
+    const priceId = plan.stripe_price_env ? env.billing.priceIds[`${plan.key}:${cycle}`] ?? '' : '';
+    if (priceId) return { price: priceId, quantity: 1 };
+    return {
+      price_data: {
+        currency: 'eur',
+        unit_amount: amountForPlan(plan, cycle),
+        recurring: { interval: cycle === 'monthly' ? 'month' : 'year' },
+        product_data: { name: `VELORA ${plan.name}`, description: plan.positioning },
+      },
+      quantity: 1,
+    };
+  }
+
+  async checkout(ctx: BillingContext): Promise<BillingIntent> {
+    const policy = methodPolicy();
+    if (ctx.billingCycle === 'monthly' && !canSellMonthly(policy)) {
+      throw new ConstraintError(
+        'The monthly plan renews by itself, and none of the enabled payment methods can be re-charged. Choose the annual plan, or enable card or a direct debit.',
+      );
+    }
+    const types = checkoutMethodTypes(policy);
+    const options = checkoutMethodOptions(policy);
+
+    const session = await stripeRequest<{ url?: string | null; id?: string }>('/v1/checkout/sessions', {
+      secret: this.key,
+      idempotencyKey: `velora-checkout-${ctx.actor.id}-${ctx.plan.key}-${ctx.billingCycle}`,
+      params: {
+        mode: 'subscription',
+        client_reference_id: ctx.actor.id,
+        customer_email: ctx.email,
+        line_items: [this.lineItem(ctx.plan, ctx.billingCycle)],
+        // Only the rails the operator switched on: an option Stripe has not enabled
+        // on the account renders as a dead button, which reads as our bug.
+        ...(types.length ? { payment_method_types: types } : {}),
+        ...(options ? { payment_method_options: options } : {}),
+        subscription_data: {
+          ...(ctx.billingCycle === 'annual' ? { trial_period_days: 14 } : {}),
+          metadata: { plan: ctx.plan.key, cycle: ctx.billingCycle, userId: ctx.actor.id },
+        },
+        metadata: { plan: ctx.plan.key, cycle: ctx.billingCycle, userId: ctx.actor.id },
+        invoice_creation: { enabled: true },
+        allow_promotion_codes: false,
+        success_url: `${ctx.appUrl}/membership?status=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${ctx.appUrl}/membership?status=cancelled`,
+      },
+    });
+    if (!session.url) throw new ConstraintError('Stripe did not return a checkout URL.');
+    return {
+      url: session.url,
+      provider: 'stripe',
+      simulated: false,
+      message: `Opening Stripe Checkout. You can pay by ${methodsSummary(policy)}.`,
+    };
+  }
+
+  /**
+   * A transfer is not a checkout: nobody is there to authorise a payment, so the
+   * product opens an invoice and Stripe renders the transfer instructions on its own
+   * hosted page. The subscription is created `default_incomplete`, and only the
+   * `invoice.paid` webhook makes it `active` — the point of the whole arrangement.
+   */
+  async transferInvoice(ctx: BillingContext): Promise<BillingIntent> {
+    const policy = methodPolicy();
+    if (!policy.enabled.some((method) => method.kind === 'transfer')) {
+      throw new ConstraintError('Bank transfer is not enabled. Add bank_transfer to VELORA_PAYMENT_METHODS and switch it on in the Stripe Dashboard.');
+    }
+    if (ctx.billingCycle !== 'annual') {
+      throw new ConstraintError(
+        'A transfer is initiated by the payer, so it cannot pay a monthly renewal. The transfer option belongs to the annual plan, where one invoice covers the year.',
+      );
+    }
+
+    const customer = await this.customerId(ctx);
+    const types = Array.from(new Set(policy.enabled.map((method) => method.stripeType)));
+    const subscription = await stripeRequest<{ latest_invoice?: string | { id?: string } | null }>('/v1/subscriptions', {
+      secret: this.key,
+      idempotencyKey: `velora-transfer-${ctx.actor.id}-${ctx.plan.key}`,
+      params: {
+        customer,
+        items: [this.lineItem(ctx.plan, 'annual')],
+        collection_method: 'send_invoice',
+        days_until_due: env.billing.transferDueDays,
+        payment_behavior: 'default_incomplete',
+        payment_settings: {
+          save_default_payment_method: 'off',
+          ...(types.length ? { payment_method_types: types } : {}),
+        },
+        metadata: { plan: ctx.plan.key, cycle: ctx.billingCycle, userId: ctx.actor.id },
+      },
+    });
+
+    const invoiceId = typeof subscription.latest_invoice === 'string' ? subscription.latest_invoice : subscription.latest_invoice?.id;
+    if (!invoiceId) throw new ConstraintError('Stripe created the subscription but no invoice to pay it with.');
+
+    const invoice = await stripeRequest<{ hosted_invoice_url?: string | null; number?: string | null }>(
+      `/v1/invoices/${invoiceId}/finalize_invoice`,
+      { secret: this.key, idempotencyKey: `velora-transfer-finalise-${invoiceId}`, params: { auto_advance: false } },
+    );
+
+    const amount = amountForPlan(ctx.plan, 'annual');
+    upsertStripeSubscription(ctx.actor.id, { plan: ctx.plan.key, status: 'incomplete', cycle: 'annual', amount, customer, subscription: null });
+
+    // The member's own ledger shows the open invoice while the transfer is on its way.
+    // Without this row the screen says "nothing pending" about an invoice that exists.
+    getDb().run(
+      `INSERT INTO invoices (id, user_id, subscription_id, number, description, amount_cents, currency, status, issued_at, receipt_url)
+       VALUES (@id, @userId, (SELECT id FROM subscriptions WHERE user_id = @userId), @number, @description, @amount, 'EUR', 'open', @ts, @url)`,
+      {
+        id: newId('inv'),
+        userId: ctx.actor.id,
+        number: String(invoice.number ?? invoiceId),
+        description: `${ctx.plan.name} — annual service fee, awaiting transfer`,
+        amount,
+        ts: nowIso(),
+        url: invoice.hosted_invoice_url ?? null,
+      },
+    );
+
+    return {
+      url: invoice.hosted_invoice_url ?? '/membership',
+      provider: 'stripe',
+      simulated: false,
+      message: `Invoice ${invoice.number ?? invoiceId} is open. Stripe shows the account details to transfer from on its own page; your membership switches on when the payment is confirmed, never before. You have ${env.billing.transferDueDays} days.`,
+    };
+  }
+
+  /** Immediate cancellation at the provider; only reachable with keys configured. */
+  async cancelNow(providerSubscriptionId: string): Promise<void> {
+    await stripeRequest(`/v1/subscriptions/${providerSubscriptionId}`, {
+      secret: this.key,
+      method: 'DELETE',
+      params: { invoice_now: true, prorate: false },
+    });
+  }
+
+  async portal(ctx: { actor: Actor; email: string; appUrl: string }): Promise<BillingIntent> {
+    const customer = await this.customerId({ actor: ctx.actor, email: ctx.email });
+    const session = await stripeRequest<{ url?: string | null }>('/v1/billing_portal/sessions', {
+      secret: this.key,
+      params: { customer, return_url: `${ctx.appUrl}/membership` },
     });
     if (!session.url) throw new ConstraintError('Stripe did not return a portal URL.');
     return { url: session.url, provider: 'stripe', simulated: false, message: 'Opening the Stripe customer portal.' };
   }
 }
-
 export const demoBilling = new DemoBilling();
 export const stripeBilling = new StripeBilling();
 
