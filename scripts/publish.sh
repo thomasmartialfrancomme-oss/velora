@@ -50,19 +50,28 @@ echo "   $FULL_SHA est sur $OWNER/$REPO ✓"
 
 echo "── 3/4  Render ──"
 if [ -z "$RENDER_API_KEY" ]; then
-  echo "   aucune clé d'API Render : auto-déploiement supposé, on attend le build traduit (10 min max)."
+  echo "   aucune clé d'API Render : auto-déploiement supposé, on attend CE build précis (12 min max)."
+  # Attendre « du français » ne prouverait rien : la version déjà en ligne est traduite
+  # depuis des jours. On attend un marqueur apparu uniquement dans cette tête — le
+  # résolveur de facturation, dont /api/health rend désormais le compte et la source.
+  marker='"account":{"id"'
   ready=0
-  for attempt in $(seq 1 40); do
+  for attempt in $(seq 1 48); do
     sleep 15
-    if curl -s -m 60 -H 'Accept-Language: fr-FR,fr;q=0.9' "$PUBLIC_URL/" | grep -q 'lang="fr"'; then
-      echo "   le site public sert la version traduite ✓"
+    health=$(curl -s -m 60 "$PUBLIC_URL/api/health" || true)
+    if printf '%s' "$health" | grep -q "$marker"; then
+      echo "   le site public sert bien la version poussée ✓"
       ready=1
       break
     fi
-    printf '   attente (%s/40)\r' "$attempt"
+    printf '   attente du build (%s/48)\r' "$attempt"
   done
   echo
-  [ "$ready" = "1" ] || echo "   timeout : le build n'est pas encore visible — vérifiez le journal sur Render."
+  if [ "$ready" != "1" ]; then
+    echo "   timeout : le build n'est pas encore visible. Render n'a peut-être pas l'auto-déploiement activé —"
+    echo "   relancez avec RENDER_API_KEY=… pour déclencher le déploiement, ou cliquez Render → Manual Deploy."
+    echo "   dernier /api/health : $(printf '%s' "$health" | head -c 160)"
+  fi
 else
   DEPLOY_ID=$(curl -sS -X POST "https://api.render.com/v1/services/${RENDER_SERVICE}/deploys" \
     -H "Authorization: Bearer ${RENDER_API_KEY}" -H "Content-Type: application/json" \
