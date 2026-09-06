@@ -129,7 +129,7 @@ Si un membre annule, la coupure est demandée chez Stripe (`DELETE /v1/subscript
 `invoice_now`) puis reflétée localement ; l'état local n'est jamais la source de vérité du
 contrat, c'est le miroir — et le webhook est la seule chose qui puisse l'écrire.
 
-## 5. Ce que `npm run check:stripe` prouve, sans compte Stripe (73 contrôles)
+## 5. Ce que `npm run check:stripe` prouve, sans compte Stripe (76 contrôles)
 Quatre regles de Stripe sont verifiees par le harnais parce qu'elles ont ete mesurees sur le
 compte reel, pas devinees : `GET /v1/prices?lookup_keys[0]=` (il n'existe pas de route
 `/v1/prices/lookup`), les vrais noms de capacites (`card_payments`, `sepa_debit_payments`, …) lus
@@ -160,6 +160,18 @@ Le script d'installation, lui, est vérifié contre le même bouchon : 11 appels
 prix aux montants exacts du catalogue (199,00 € ; 2 149,20 € ; 499,00 € ; 5 269,44 € ; 1 500,00 € ;
 18 000,00 €), portail, webhook, et aucune clé renvoyée.
 
+
+## 5 bis. La signature du webhook se calcule sur la cle complete
+
+`Stripe-Signature: t=<timestamp>,v1=<hex>` ou `v1` est un HMAC-SHA256 de `"<t>.<corps brut>"`
+calcule **avec la valeur entiere du secret, `whsec_` compris**. Ce fichier enlevait le prefixe avant
+de hasher — et le harnais faisait pareil, donc la suite restait verte. Resultat : toute livraison
+reelle de Stripe aurait repondu `signature_invalid`, l'argent entre chez Stripe sans que l'adhesion
+ne passe jamais a « payee », et rien a l'ecran ne le dirait. Verifie en installant le SDK officiel
+(`stripe-node` 22.6.1) et en faisant tourner `webhooks.constructEvent` : la cle complete est
+acceptee, la cle amputee est refusee. Le harnais livre desormais les evenements comme Stripe (prefixe
+inclus) et refuse explicitement une signature calculee sur la cle amputee ; reinjecter le retrait du
+prefixe fait tomber la suite de 76 a 68.
 ## 6. Ce qui reste honnêtement non vérifiable ici
 
 - **Un vrai débit.** Sans votre clé live, aucun euro n'a bougé dans aucun test — le harnais prouve

@@ -350,7 +350,7 @@ const mock = http.createServer((request, response) => {
 /* ------------------------------------------------------- the signature */
 
 function sign(raw, secret = WEBHOOK_SECRET, timestamp = Math.floor(Date.now() / 1000)) {
-  const v1 = crypto.createHmac('sha256', secret.replace(/^whsec_/, '')).update(`${timestamp}.${raw}`).digest('hex');
+  const v1 = crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex'); // comme Stripe : préfixe inclus
   return `t=${timestamp},v1=${v1}`;
 }
 
@@ -560,6 +560,10 @@ try {
   check('une signature d’il y a une heure est refusée (rejeu)', stale.status === 400 && /replay|older/i.test(stale.json?.error?.message ?? ''), JSON.stringify(stale.json).slice(0, 140));
 
   const wrongSecret = await sendEvent({ ...paidEvent, id: `evt_${crypto.randomBytes(3).toString('hex')}` }, { secret: 'whsec_quelqu_un_d_autre' });
+  // Le piège exact qui a rendu tous les webhooks de production invisibles : une signature calculée
+  // avec `whsec_` retiré de la clé. Un produit qui enlève le préfixe l'accepterait, Stripe jamais.
+  const amputee = await sendEvent({ ...paidEvent, id: `evt_${crypto.randomBytes(3).toString('hex')}` }, { secret: WEBHOOK_SECRET.replace(/^whsec_/, '') });
+  check('une signature calct sur la clé amputée est rejetée', amputee.status === 400, `reçu ${amputee.status}`);
   check('un événement signé avec une autre clé est refusé', wrongSecret.status === 400, JSON.stringify(wrongSecret.json).slice(0, 120));
 
   // ── virement : une facture, jamais un prélèvement automatique ──

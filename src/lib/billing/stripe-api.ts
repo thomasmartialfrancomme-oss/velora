@@ -158,7 +158,12 @@ export interface SignatureCheck {
 
 /**
  * Verify a `Stripe-Signature` header: `t=<unix>,v1=<hex>` pairs, HMAC-SHA256 over
- * `"<t>.<raw body>"` keyed by the webhook secret (with the `whsec_` prefix removed).
+ * `"<t>.<raw body>"` keyed by the webhook secret **exactly as Stripe gave it**, `whsec_`
+ * prefix included. Verified against the official SDK (stripe-node 22.6.1, installed and run
+ * locally): `constructEvent` accepts the full key and rejects the stripped one. Stripping the
+ * prefix — which this file used to do, and which the local harness dutifully mirrored — makes
+ * every genuine delivery from Stripe fail with `signature_invalid`: money is collected, the
+ * member is never told, and nothing on the screen looks wrong.
  *
  * The tolerance check is not theatre: a valid signature for a body captured last
  * week is still a valid signature, so replaying it would re-run a paid event.
@@ -170,7 +175,8 @@ export async function verifyStripeSignature(input: {
   toleranceSeconds?: number;
   now?: number;
 }): Promise<SignatureCheck> {
-  const secret = (input.secret ?? billingRuntime().webhookSecret).replace(/^whsec_/, '');
+  // Le préfixe fait partie de la clé : ne pas le retirer (voir le commentaire ci-dessus).
+  const secret = String(input.secret ?? billingRuntime().webhookSecret ?? '').trim();
   if (!secret) return { ok: false, reason: 'no_secret' };
   if (!input.header) return { ok: false, reason: 'missing_header' };
 
@@ -210,6 +216,6 @@ export async function verifyStripeSignature(input: {
 /** Sign like Stripe does — used by the local harness, and by nothing that ships. */
 export async function signStripePayload(raw: string, secret: string, timestamp = Math.floor(Date.now() / 1000)): Promise<string> {
   const crypto = await import('node:crypto');
-  const v1 = crypto.createHmac('sha256', secret.replace(/^whsec_/, '')).update(`${timestamp}.${raw}`).digest('hex');
+  const v1 = crypto.createHmac('sha256', String(secret).trim()).update(`${timestamp}.${raw}`).digest('hex');
   return `t=${timestamp},v1=${v1}`;
 }
