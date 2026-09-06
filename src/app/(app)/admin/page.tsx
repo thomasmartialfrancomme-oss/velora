@@ -9,11 +9,13 @@ import { adminAccessRequests, adminActivity, adminAiRequests, adminProperties, a
 import { getBillingStatus } from '@/lib/billing';
 import { activeProviderInfo } from '@/lib/ai/service';
 import { formatDate, formatMoney, label as humanise, relativeTime, STATUS_LABEL } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Administration' };
 export const dynamic = 'force-dynamic';
 
 function Sparkline({ points, label }: { points: { day: string; count: number }[]; label: string }) {
+  const T = getT();
   const max = Math.max(1, ...points.map((point) => point.count));
   return (
     <div>
@@ -42,6 +44,7 @@ function Sparkline({ points, label }: { points: { day: string; count: number }[]
 }
 
 export default async function AdminOverviewPage() {
+  const T = getT();
   const admin = await requireAdmin();
   const stats = adminStats();
   const subscriptions = adminSubscriptions();
@@ -68,7 +71,7 @@ export default async function AdminOverviewPage() {
             <span>{billing.stripeConfigured ? 'Stripe connected' : 'Billing simulated'}</span>
           </>
         }
-        actions={<ConsoleLink href="/admin/access-requests">Open the queue</ConsoleLink>}
+        actions={<ConsoleLink href="/admin/access-requests">{T("Open the queue")}</ConsoleLink>}
       />
 
       <StatStrip
@@ -86,7 +89,7 @@ export default async function AdminOverviewPage() {
             label="Book of members"
             title="Subscriptions"
             description="Read from our own rows. Amounts are what the membership was recorded at, not an invoice from a processor."
-            actions={<ConsoleLink href="/admin/users">Accounts</ConsoleLink>}
+            actions={<ConsoleLink href="/admin/users">{T("Accounts")}</ConsoleLink>}
           />
           <Divider className="my-5" />
           {subscriptions.length ? (
@@ -94,11 +97,11 @@ export default async function AdminOverviewPage() {
               <table className="w-full min-w-[620px] border-collapse text-left">
                 <thead>
                   <tr className="text-[10px] uppercase tracking-[0.18em] text-graphite-500">
-                    <th className="px-2 pb-3 font-medium">Member</th>
-                    <th className="px-2 pb-3 font-medium">Plan</th>
-                    <th className="px-2 pb-3 font-medium">State</th>
-                    <th className="px-2 pb-3 text-right font-medium">Amount</th>
-                    <th className="px-2 pb-3 text-right font-medium">Period end</th>
+                    <th className="px-2 pb-3 font-medium">{T("Member")}</th>
+                    <th className="px-2 pb-3 font-medium">{T("Plan")}</th>
+                    <th className="px-2 pb-3 font-medium">{T("State")}</th>
+                    <th className="px-2 pb-3 text-right font-medium">{T("Amount")}</th>
+                    <th className="px-2 pb-3 text-right font-medium">{T("Period end")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ivory-200/[0.05]">
@@ -126,7 +129,7 @@ export default async function AdminOverviewPage() {
               </table>
             </div>
           ) : (
-            <p className="text-[12.5px] leading-relaxed text-graphite-400">No subscription has been recorded on this deployment.</p>
+            <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("No subscription has been recorded on this deployment.")}</p>
           )}
           <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">
             {billing.stripeConfigured
@@ -211,7 +214,7 @@ export default async function AdminOverviewPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-[12.5px] leading-relaxed text-graphite-400">Nobody is waiting. The intake form is open at /access/request.</p>
+            <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Nobody is waiting. The intake form is open at /access/request.")}</p>
           )}
         </Panel>
 
@@ -233,7 +236,7 @@ export default async function AdminOverviewPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-[12.5px] leading-relaxed text-graphite-400">Every question asked has been answered and closed.</p>
+            <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Every question asked has been answered and closed.")}</p>
           )}
         </Panel>
 
@@ -274,7 +277,7 @@ export default async function AdminOverviewPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-[12.5px] leading-relaxed text-graphite-400">No request has reached the coordinator yet.</p>
+            <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("No request has reached the coordinator yet.")}</p>
           )}
         </Panel>
 
@@ -299,13 +302,8 @@ export default async function AdminOverviewPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[5px] border border-ivory-200/[0.07] bg-ink-950/50 px-5 py-4">
         <p className="max-w-2xl text-[12px] leading-relaxed text-graphite-400">
-          <SectionLabel className="mb-1.5 inline-block text-graphite-500">Self-service limit</SectionLabel>
-          You cannot change your own role or status from this console — an administrator locking themselves out of their own deployment is the oldest
-          accident in the trade. Use a second office account for that.
-        </p>
-        <Link href="/admin/users" className="text-[11px] uppercase tracking-[0.2em] text-gold-200 transition-colors hover:text-gold-100">
-          Manage accounts →
-        </Link>
+          <SectionLabel className="mb-1.5 inline-block text-graphite-500">{T("Self-service limit")}</SectionLabel>{T("You cannot change your own role or status from this console — an administrator locking themselves out of their own deployment is the oldest accident in the trade. Use a second office account for that.")}</p>
+        <Link href="/admin/users" className="text-[11px] uppercase tracking-[0.2em] text-gold-200 transition-colors hover:text-gold-100">{T("Manage accounts →")}</Link>
       </div>
     </div>
   );

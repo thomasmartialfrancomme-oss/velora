@@ -10,6 +10,7 @@ import { SelectField, TextArea, TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { ApiClientError, apiRequest } from '@/lib/http/client';
 import { DOCUMENT_CATEGORIES, STATUS_LABEL, label as humanise } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 const MAX_MB = 15;
 const ACCEPT = '.pdf,.docx,.xlsx,.pptx,.csv,.txt,.md,.png,.jpg,.jpeg,.webp,.heic';
@@ -21,6 +22,7 @@ export function DocumentUpload({
   properties: { id: string; name: string }[];
   defaultPropertyId?: string;
 }) {
+  const T = useT();
   const router = useRouter();
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,9 +75,7 @@ export function DocumentUpload({
 
   return (
     <>
-      <Button type="button" variant="gold-outline" size="md" icon={<Upload size={13} strokeWidth={1.4} />} onClick={() => setOpen(true)}>
-        Upload a file
-      </Button>
+      <Button type="button" variant="gold-outline" size="md" icon={<Upload size={13} strokeWidth={1.4} />} onClick={() => setOpen(true)}>{T("Upload a file")}</Button>
 
       <Modal
         open={open}
@@ -87,12 +87,8 @@ export function DocumentUpload({
         loading={pending}
         footer={
           <>
-            <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={pending}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={submit} loading={pending} icon={<Paperclip size={13} strokeWidth={1.4} />}>
-              Store it
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={pending}>{T("Cancel")}</Button>
+            <Button size="sm" onClick={submit} loading={pending} icon={<Paperclip size={13} strokeWidth={1.4} />}>{T("Store it")}</Button>
           </>
         }
       >
@@ -113,7 +109,7 @@ export function DocumentUpload({
               </>
             ) : (
               <>
-                <p className="text-[13px] text-graphite-200">Drop a file, or choose one</p>
+                <p className="text-[13px] text-graphite-200">{T("Drop a file, or choose one")}</p>
                 <p className="text-[11.5px] text-graphite-500">pdf · docx · xlsx · pptx · csv · txt · md · png · jpg · webp · heic — up to {MAX_MB} MB</p>
               </>
             )}

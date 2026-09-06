@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, useInView, useReducedMotion } from 'framer-motion';
 import { Section } from '@/components/marketing/section';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 const COMMAND = 'Prepare my arrival at the villa.';
 
@@ -18,6 +19,7 @@ const STEPS = [
 ];
 
 export function OneCommand() {
+  const T = useT();
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: false, margin: '-20% 0px -20% 0px' });
   const reduce = useReducedMotion();
@@ -66,7 +68,7 @@ export function OneCommand() {
         <div className="relative flex flex-col justify-between overflow-hidden rounded-[6px] border border-ivory-200/[0.09] bg-ink-900/60 p-8 sm:p-10">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(90%_70%_at_20%_0%,rgba(201,169,106,0.06),transparent)]" />
           <div className="relative">
-            <p className="label mb-7 text-graphite-400">Command</p>
+            <p className="label mb-7 text-graphite-400">{T("Command")}</p>
             <p className="font-serif text-[1.6rem] leading-snug text-ivory-50 sm:text-[1.9rem]">
               “{typed}
               {stage !== 'done' ? <span className="ml-1 inline-block h-[0.9em] w-[2px] translate-y-[2px] animate-caret-blink bg-gold-300 align-middle" /> : null}”
@@ -89,9 +91,7 @@ export function OneCommand() {
                 style={{ transformOrigin: 'left' }}
               />
             </div>
-            <p className="text-[12.5px] leading-relaxed text-graphite-400">
-              Two of the seven require a human decision. VELORA records them as requests and will not represent them as complete.
-            </p>
+            <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Two of the seven require a human decision. VELORA records them as requests and will not represent them as complete.")}</p>
           </div>
         </div>
 

@@ -7,9 +7,12 @@ import { PrivateField } from '@/components/marketing/private-field';
 import { Button } from '@/components/ui/button';
 import { Counter } from '@/components/ui/counter';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
-const LINE_ONE = ['Your', 'private', 'world.'];
-const LINE_TWO = ['Intelligently', 'managed.'];
+// The headline is revealed one word at a time, so the sentence travels through the
+// dictionary whole and is split afterwards: a language that needs five words where
+// English needs three still reads as the line it was written as.
+const HEADLINE = ['Your private world.', 'Intelligently managed.'];
 
 function HeadlineLine({ words, delay, className }: { words: string[]; delay: number; className?: string }) {
   const reduce = useReducedMotion();
@@ -40,6 +43,8 @@ const FACTS = [
 ];
 
 export function Hero() {
+  const T = useT();
+  const [headline, subline] = HEADLINE.map((line) => T(line).split(' '));
   const ref = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
@@ -70,8 +75,8 @@ export function Hero() {
           </motion.p>
 
           <h1 className="display text-display-xl uppercase text-shadow-lux">
-            <HeadlineLine words={LINE_ONE} delay={0.2} />
-            <HeadlineLine words={LINE_TWO} delay={0.42} className="mt-1 text-ivory-200/90" />
+            <HeadlineLine words={headline} delay={0.2} />
+            <HeadlineLine words={subline} delay={0.42} className="mt-1 text-ivory-200/90" />
           </h1>
 
           <motion.p
@@ -89,13 +94,9 @@ export function Hero() {
             transition={{ duration: 0.9, delay: 0.86, ease: [0.16, 1, 0.3, 1] }}
             className="mt-11 flex flex-wrap items-center gap-4"
           >
-            <Button href="/access/request" size="lg" asLink trailingIcon={<ArrowUpRight size={14} strokeWidth={1.4} />}>
-              Request private access
-            </Button>
+            <Button href="/access/request" size="lg" asLink trailingIcon={<ArrowUpRight size={14} strokeWidth={1.4} />}>{T("Request private access")}</Button>
             <a href="/#office" className="contents">
-              <Button variant="secondary" size="lg" type="button" onClick={() => document.getElementById('office')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })}>
-                Explore the platform
-              </Button>
+              <Button variant="secondary" size="lg" type="button" onClick={() => document.getElementById('office')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })}>{T("Explore the platform")}</Button>
             </a>
           </motion.div>
         </motion.div>
@@ -111,8 +112,8 @@ export function Hero() {
               <p className="font-serif text-[1.9rem] leading-none text-ivory-50 transition-colors duration-500 group-hover:text-gold-200">
                 <Counter value={fact.value} suffix={fact.suffix} duration={1300 + index * 160} />
               </p>
-              <p className="mt-2.5 text-[11px] uppercase tracking-[0.2em] text-graphite-300">{fact.label}</p>
-              <p className="mt-1 text-[12px] text-graphite-500">{fact.note}</p>
+              <p className="mt-2.5 text-[11px] uppercase tracking-[0.2em] text-graphite-300">{T(fact.label)}</p>
+              <p className="mt-1 text-[12px] text-graphite-500">{T(fact.note)}</p>
             </div>
           ))}
         </motion.div>
@@ -126,7 +127,7 @@ export function Hero() {
         transition={{ delay: 1.6, duration: 0.8 }}
         className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-3 text-graphite-400 transition-colors hover:text-ivory-100 lg:flex"
       >
-        <span className="text-[10px] uppercase tracking-[0.32em]">Scroll</span>
+        <span className="text-[10px] uppercase tracking-[0.32em]">{T("Scroll")}</span>
         <span className="relative flex h-10 w-px justify-center overflow-hidden bg-ivory-200/12">
           <span className="absolute top-0 h-3 w-px animate-scroll-cue bg-gold-300" />
         </span>

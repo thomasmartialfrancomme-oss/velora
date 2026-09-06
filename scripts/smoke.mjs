@@ -71,11 +71,23 @@ class Session {
       }
     }
     const response = await fetch(`${BASE}${path}`, init);
+    // Le serveur peut poser plusieurs cookies dans une même réponse (session +
+    // langue) : on les garde tous, comme le ferait un navigateur.
     const setCookie = response.headers.getSetCookie?.() ?? [];
+    const jar = new Map(
+      this.cookie
+        ? this.cookie.split('; ').map((pair) => {
+            const index = pair.indexOf('=');
+            return [pair.slice(0, index), pair.slice(index + 1)];
+          })
+        : [],
+    );
     for (const entry of setCookie) {
       const pair = entry.split(';')[0];
-      if (pair.includes('=')) this.cookie = pair;
+      const index = pair.indexOf('=');
+      if (index > 0) jar.set(pair.slice(0, index), pair.slice(index + 1));
     }
+    this.cookie = [...jar.entries()].map(([name, value]) => `${name}=${value}`).join('; ');
     const text = await response.text();
     let json = null;
     try {

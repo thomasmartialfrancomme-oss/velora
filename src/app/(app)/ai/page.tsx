@@ -14,6 +14,7 @@ import { getAiUsageToday, getConversation, getMembership, listConversations, pen
 import { activeProviderInfo } from '@/lib/ai/service';
 import type { AIBlock } from '@/lib/ai/types';
 import { STATUS_LABEL, formatMoney, getPlan, label as humanise, relativeTime } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'VELORA AI' };
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,7 @@ const SUGGESTIONS = [
 ];
 
 export default async function AiPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const conversations = listConversations(user.id);
   const selected = typeof searchParams?.c === 'string' ? searchParams.c : conversations[0]?.id ?? null;
@@ -60,10 +62,7 @@ export default async function AiPage({ searchParams }: { searchParams?: Record<s
       />
 
       {!provider.external ? (
-        <Notice tone="info" title="No model provider is configured — the deterministic coordinator is answering">
-          Set <code className="text-ivory-100">AI_PROVIDER_URL</code> and <code className="text-ivory-100">AI_API_KEY</code> to route this same
-          interface through a language model. The plan is computed from your records either way, and the honesty guard is applied to both.
-        </Notice>
+        <Notice tone="info" title="No model provider is configured — the deterministic coordinator is answering">{T("Set")}<code className="text-ivory-100">{T("AI_PROVIDER_URL")}</code> and <code className="text-ivory-100">{T("AI_API_KEY")}</code>{T("to route this same interface through a language model. The plan is computed from your records either way, and the honesty guard is applied to both.")}</Notice>
       ) : null}
 
       <StatStrip
@@ -109,7 +108,7 @@ export default async function AiPage({ searchParams }: { searchParams?: Record<s
                   ) : null}
 
                   <div className="mt-7">
-                    <p className="label mb-3 text-graphite-500">What the coordinator proposes</p>
+                    <p className="label mb-3 text-graphite-500">{T("What the coordinator proposes")}</p>
                     {thread.actions.length ? (
                       <ul className="space-y-2.5">
                         {thread.actions.map((action) => (
@@ -125,9 +124,7 @@ export default async function AiPage({ searchParams }: { searchParams?: Record<s
                               {typeof action.confidence === 'number' ? ` · confidence ${Math.round(action.confidence * 100)}%` : ''}
                             </p>
                             {action.taskId ? (
-                              <p className="mt-2 text-[11.5px] text-state-ok">
-                                Opened as a task in your records.
-                              </p>
+                              <p className="mt-2 text-[11.5px] text-state-ok">{T("Opened as a task in your records.")}</p>
                             ) : null}
                             {action.status === 'proposed' || action.status === 'requires_confirmation' ? (
                               <div className="mt-3.5 flex flex-wrap gap-2">
@@ -152,14 +149,12 @@ export default async function AiPage({ searchParams }: { searchParams?: Record<s
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-[12.5px] leading-relaxed text-graphite-400">
-                        This answer proposed no changes to your records — it was a question of fact, and the answer is above.
-                      </p>
+                      <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("This answer proposed no changes to your records — it was a question of fact, and the answer is above.")}</p>
                     )}
                   </div>
                 </>
               ) : (
-                <p className="text-[12.5px] leading-relaxed text-graphite-400">The conversation has your question but no answer was stored.</p>
+                <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("The conversation has your question but no answer was stored.")}</p>
               )}
             </Panel>
           ) : (
@@ -189,10 +184,7 @@ export default async function AiPage({ searchParams }: { searchParams?: Record<s
                 </div>
               ))}
             </dl>
-            <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">
-              Swapping the provider is one file: <code className="text-graphite-200">src/lib/ai/service.ts</code> resolves it from the environment, and
-              no component ever talks to a model directly.
-            </p>
+            <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">{T("Swapping the provider is one file:")}<code className="text-graphite-200">src/lib/ai/service.ts</code>{T("resolves it from the environment, and no component ever talks to a model directly.")}</p>
           </Panel>
 
           <Panel>
@@ -249,15 +241,13 @@ export default async function AiPage({ searchParams }: { searchParams?: Record<s
                           {conversation.provider}
                         </span>
                       </span>
-                      <span className="shrink-0 text-[10.5px] uppercase tracking-[0.16em] text-graphite-600 transition-colors group-hover:text-gold-200">Open</span>
+                      <span className="shrink-0 text-[10.5px] uppercase tracking-[0.16em] text-graphite-600 transition-colors group-hover:text-gold-200">{T("Open")}</span>
                     </Link>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-graphite-400">
-                Nothing asked yet. A conversation is stored so the office can be held to what it said — including what it refused to promise.
-              </p>
+              <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Nothing asked yet. A conversation is stored so the office can be held to what it said — including what it refused to promise.")}</p>
             )}
           </Panel>
 

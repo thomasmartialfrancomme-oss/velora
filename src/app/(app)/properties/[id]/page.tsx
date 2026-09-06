@@ -22,6 +22,7 @@ import {
   label as humanise,
   relativeTime,
 } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default async function PropertyDossierPage({ params }: { params: { id: string } }) {
+  const T = getT();
   const user = await requireUser();
   const dossier = getPropertyDossier(user.id, params.id);
   if (!dossier) notFound();
@@ -227,10 +229,10 @@ export default async function PropertyDossierPage({ params }: { params: { id: st
                 format={{ kind: 'money', currency: user.currency, compact: true }}
               />
             ) : (
-              <p className="text-[13px] leading-relaxed text-graphite-400">Nothing has been booked to this residence yet.</p>
+              <p className="text-[13px] leading-relaxed text-graphite-400">{T("Nothing has been booked to this residence yet.")}</p>
             )}
             <div className="mt-6">
-              <SectionLabel>The five largest entries</SectionLabel>
+              <SectionLabel>{T("The five largest entries")}</SectionLabel>
               <ul className="mt-3 space-y-2">
                 {expenses.slice(0, 5).map((expense) => (
                   <li key={expense.id} className="flex items-baseline justify-between gap-4 border-b border-ivory-200/[0.05] pb-2 text-[12.5px] last:border-b-0">
@@ -241,7 +243,7 @@ export default async function PropertyDossierPage({ params }: { params: { id: st
                     <span className="shrink-0 tabular-nums text-ivory-100">{formatMoney(expense.amountCents, { currency: user.currency })}</span>
                   </li>
                 ))}
-                {!expenses.length ? <li className="text-[12.5px] text-graphite-600">No entries.</li> : null}
+                {!expenses.length ? <li className="text-[12.5px] text-graphite-600">{T("No entries.")}</li> : null}
               </ul>
             </div>
           </Panel>
@@ -249,7 +251,7 @@ export default async function PropertyDossierPage({ params }: { params: { id: st
 
         <div className="space-y-6">
           <Panel>
-            <PanelHeader label="Household" title="Who looks after it" actions={<Link href="/people" className="link-lux text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 hover:text-ivory-100">Directory →</Link>} />
+            <PanelHeader label="Household" title="Who looks after it" actions={<Link href="/people" className="link-lux text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 hover:text-ivory-100">{T("Directory →")}</Link>} />
             <Divider className="my-5" />
             {staff.length ? (
               <ul className="space-y-3">
@@ -277,7 +279,7 @@ export default async function PropertyDossierPage({ params }: { params: { id: st
           </Panel>
 
           <Panel>
-            <PanelHeader label="Papers" title="Documents on file" actions={<Link href="/documents" className="link-lux text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 hover:text-ivory-100">Library →</Link>} />
+            <PanelHeader label="Papers" title="Documents on file" actions={<Link href="/documents" className="link-lux text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 hover:text-ivory-100">{T("Library →")}</Link>} />
             <Divider className="my-5" />
             {documents.length ? (
               <ul className="space-y-2.5">
@@ -292,7 +294,7 @@ export default async function PropertyDossierPage({ params }: { params: { id: st
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-graphite-400">No documents are attached to this residence. Contracts, insurance and inventories belong here.</p>
+              <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("No documents are attached to this residence. Contracts, insurance and inventories belong here.")}</p>
             )}
           </Panel>
 
@@ -316,11 +318,9 @@ export default async function PropertyDossierPage({ params }: { params: { id: st
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-graphite-400">No vehicle is kept at this residence.</p>
+              <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("No vehicle is kept at this residence.")}</p>
             )}
-            <Button asLink href="/vehicles" variant="secondary" size="sm" className="mt-5 w-full">
-              Open the fleet
-            </Button>
+            <Button asLink href="/vehicles" variant="secondary" size="sm" className="mt-5 w-full">{T("Open the fleet")}</Button>
           </Panel>
 
           <Panel>
@@ -341,7 +341,7 @@ export default async function PropertyDossierPage({ params }: { params: { id: st
                 ))}
               </ol>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-graphite-400">Nothing has been recorded against this residence yet.</p>
+              <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Nothing has been recorded against this residence yet.")}</p>
             )}
           </Panel>
         </div>

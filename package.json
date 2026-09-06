@@ -2,7 +2,7 @@
   "name": "velora-private",
   "version": "1.0.0",
   "private": true,
-  "description": "VELORA PRIVATE — AI Private Estate & Lifestyle Manager",
+  "description": "VELORA PRIVATE \u2014 AI Private Estate & Lifestyle Manager",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
@@ -17,7 +17,10 @@
     "db:sql": "node --no-warnings scripts/db-cli.mjs sql",
     "check": "npm run typecheck && npm run db:verify",
     "smoke": "node --no-warnings scripts/smoke.mjs",
-    "db:prepare": "node --no-warnings scripts/prepare-runtime.mjs"
+    "db:prepare": "node --no-warnings scripts/prepare-runtime.mjs",
+    "i18n:extract": "node scripts/i18n.mjs extract",
+    "i18n:coverage": "node scripts/i18n.mjs coverage",
+    "i18n:missing": "node scripts/i18n.mjs missing"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

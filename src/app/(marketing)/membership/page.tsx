@@ -8,6 +8,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { getMembership } from '@/lib/data/read';
 import { getBillingStatus } from '@/lib/billing';
 import { MEMBERSHIP_PLANS, formatDate, formatDateTime, formatMoney, getPlan, label as humanise, STATUS_LABEL } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = {
   title: 'Membership',
@@ -33,6 +34,7 @@ const HOW_BILLING_WORKS = [
 ];
 
 export default async function MembershipPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await getCurrentUser();
   const requested = typeof searchParams?.plan === 'string' ? searchParams.plan : undefined;
 
@@ -57,13 +59,9 @@ export default async function MembershipPage({ searchParams }: { searchParams?: 
           <div className="flex flex-col items-start gap-3 text-[11px] uppercase tracking-[0.18em] text-graphite-500">
             <span className={billing.stripeConfigured ? 'text-state-ok' : 'text-gold-200'}>{billing.label}</span>
             {user ? (
-              <Link href="/dashboard" className="text-gold-200 transition-colors hover:text-gold-100">
-                Return to the dashboard →
-              </Link>
+              <Link href="/dashboard" className="text-gold-200 transition-colors hover:text-gold-100">{T("Return to the dashboard →")}</Link>
             ) : (
-              <Link href="/login" className="text-gold-200 transition-colors hover:text-gold-100">
-                Sign in to change your membership →
-              </Link>
+              <Link href="/login" className="text-gold-200 transition-colors hover:text-gold-100">{T("Sign in to change your membership →")}</Link>
             )}
           </div>
         }
@@ -141,16 +139,12 @@ export default async function MembershipPage({ searchParams }: { searchParams?: 
                   ))}
                 </ul>
               ) : (
-                <p className="mt-5 text-[12.5px] leading-relaxed text-graphite-400">
-                  No invoice has been raised against this account. The first follows the checkout confirmation, not the click.
-                </p>
+                <p className="mt-5 text-[12.5px] leading-relaxed text-graphite-400">{T("No invoice has been raised against this account. The first follows the checkout confirmation, not the click.")}</p>
               )}
 
               <p className="mt-auto pt-8 text-[11.5px] leading-relaxed text-graphite-500">
                 <Lock size={11} strokeWidth={1.5} className="mr-1.5 inline align-[-1px] text-gold-300/70" />
-                Prices are a single list in <code className="text-graphite-300">src/lib/utils/format.ts</code>. Changing the number there changes this page, the
-                API, the admin console and the checkout amount — no migration, no second place to remember.
-              </p>
+                Prices are a single list in <code className="text-graphite-300">src/lib/utils/format.ts</code>{T(". Changing the number there changes this page, the API, the admin console and the checkout amount — no migration, no second place to remember.")}</p>
             </div>
           </div>
         </Section>
@@ -169,15 +163,11 @@ export default async function MembershipPage({ searchParams }: { searchParams?: 
           <div className="flex flex-wrap gap-3">
             {user ? null : (
               <>
-                <ButtonLink href="/access/request">Request access</ButtonLink>
-                <ButtonLink href="/login" quiet>
-                  I already have an account
-                </ButtonLink>
+                <ButtonLink href="/access/request">{T("Request access")}</ButtonLink>
+                <ButtonLink href="/login" quiet>{T("I already have an account")}</ButtonLink>
               </>
             )}
-            <ButtonLink href="/security" quiet>
-              How data is held
-            </ButtonLink>
+            <ButtonLink href="/security" quiet>{T("How data is held")}</ButtonLink>
             <ButtonLink href="/terms" quiet>
               Terms & pricing
             </ButtonLink>
@@ -219,6 +209,7 @@ export default async function MembershipPage({ searchParams }: { searchParams?: 
 }
 
 function ButtonLink({ href, children, quiet }: { href: string; children: React.ReactNode; quiet?: boolean }) {
+  const T = getT();
   return (
     <Link
       href={href}

@@ -30,7 +30,8 @@ Change these in `db/demo-data.mjs` (`DEMO_CREDENTIALS`). They exist only so a de
 | [What is not switched on](#what-is-not-switched-on-and-exactly-what-would-turn-it-on) | [Architecture](#architecture) |
 | [Privacy model](#privacy-model) | [AI layer](#the-ai-layer) |
 | [Membership & billing](#membership-and-billing) | [Database CLI](#database-cli) |
-| [Launching it](#launching-it) | [Deploying on Render](#deploying-on-render) |
+| [Languages](#languages) | [Launching it](#launching-it) |
+| [Deploying on Render](#deploying-on-render) | [First administrator](#the-first-administrator-account) |
 | [First administrator](#the-first-administrator-account) | [Repository hygiene](#repository-hygiene) |
 
 ---
@@ -90,6 +91,58 @@ Two things that pass in development and fail in production were found by exactly
 | **Virus scanning of uploads** | Absent, and stated in the file-storage comment | an ICAP/clamav sidecar at the storage layer | — |
 
 `GET /api/health` reports the live state of all of these, so nobody has to guess during a demo.
+
+## Languages
+
+The interface is multilingual, and the mechanism is deliberately boring: **the English
+source text is the key**. A component asks for its own sentence — `T('Open dashboard')` —
+and the active language either answers or stays out of the way. Nothing can render empty,
+nothing can drift out of sync with the copy, and adding a language never means touching a
+page.
+
+| | |
+| --- | --- |
+| `src/lib/i18n/locales.ts` | the installed languages, their native names, cookie name, and `Accept-Language` negotiation |
+| `src/lib/i18n/translate.ts` | the lookup, `{var}` interpolation, Intl locale tags |
+| `src/lib/i18n/server.ts` | language resolution for the request: cookie → `users.locale` (mirrored into the cookie at sign-in) → `Accept-Language` → `en` |
+| `src/lib/i18n/context.tsx` | the provider mounted by the root layout, `useT()` for interactive parts, `<L10n>` — a leaf any server component can render |
+| `src/lib/i18n/dictionaries/*.ts` | one flat table per language, keyed on the exact English string |
+
+Resolution happens **once per request**, in the root layout, which also sets `<html lang>`
+and `dir`. The chrome that carries most of the product's words — page headers, panel
+headers, table columns and their empty rows, badges, stat strips, notices, form labels and
+hints, filters, navigation, toasts — looks up its strings itself, in the component every
+page already goes through. A member area page therefore needs no translation code at all.
+
+Language choice: `LocaleSwitcher` in the site header, the footer, the sign-in screens and
+Settings. `POST /api/locale` sets the cookie; if a session exists, it also writes
+`users.locale` and records `account.language_changed`, so the choice survives a new device.
+
+```bash
+npm run i18n:extract     # regenerate src/lib/i18n/keys.json from the components
+npm run i18n:coverage    # how much of that list each language actually answers
+npm run i18n:missing fr  # the exact lines still to write, ready to paste
+```
+
+Current state — French is the priority language, and the measurement is the point:
+
+| language | coverage | what it covers |
+| --- | --- | --- |
+| `fr` | ~53 % | every public page, sign-in and access request, all navigation, all chrome, statuses, filters, form labels |
+| `de`, `es`, `it` | ~10 % | navigation, chrome, buttons, statuses, the sign-in screen, the marketing headlines |
+| `en` | source | the text the product is written in |
+
+Everything not yet authored renders in English on purpose. Legal pages (privacy, terms,
+security) carry a visible note in other languages: the translated page is a courtesy, the
+English text governs — which is also why `de/it/es` are not offered for the fine print
+before someone has reviewed them.
+
+`users.locale` is a full BCP-47 tag (`en-GB`, `fr-FR`, `de-DE`, `it-IT`, `es-ES`, `ar-AE`,
+`ja-JP`): dates, numbers and currency follow it everywhere, while the *words* follow the
+installed dictionary. Arabic and Japanese therefore format correctly and keep English
+labels until their dictionaries exist — RTL is wired (`dir` on `<html>`) but no table ships.
+
+---
 
 ## Architecture
 

@@ -48,3 +48,23 @@ export function L10n({ source, vars, className }: { source: string; vars?: Vars;
   if (className) return <span className={className}>{text}</span>;
   return <>{text}</>;
 }
+
+/**
+ * The same leaf for display copy that carries its own line breaks: one translated
+ * string in, one stacked line out. A headline authored as two lines in English is
+ * still two lines in a language that needs four words where English needs three.
+ */
+export function L10nLines({ source, className }: { source: string; className?: string }) {
+  const T = useT();
+  return (
+    <>
+      {T(source)
+        .split('\n')
+        .map((line, index) => (
+          <span key={index} className={index ? 'block' : undefined}>
+            {line}
+          </span>
+        ))}
+    </>
+  );
+}

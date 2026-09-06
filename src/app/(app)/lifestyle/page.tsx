@@ -13,6 +13,7 @@ import { requireUser } from '@/lib/auth/session';
 import { listProperties, listReservations } from '@/lib/data/read';
 import type { ReservationRow } from '@/lib/data/tables';
 import { RESERVATION_KINDS, RESERVATION_STATUS, STATUS_LABEL, formatDate, formatDateTime, formatTime, label as humanise, relativeTime } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Lifestyle' };
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ export const dynamic = 'force-dynamic';
 type Row = ReservationRow;
 
 export default async function LifestylePage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const scopeRaw = typeof searchParams?.scope === 'string' ? searchParams.scope : 'upcoming';
   const scope = (['upcoming', 'past', 'all'].includes(scopeRaw) ? scopeRaw : 'upcoming') as 'upcoming' | 'past' | 'all';
@@ -69,7 +71,7 @@ export default async function LifestylePage({ searchParams }: { searchParams?: R
     {
       key: 'when',
       header: 'When',
-      cell: (row) => (row.startsAt ? <span className="text-graphite-200">{formatDateTime(row.startsAt, user.timezone)}</span> : <span className="text-graphite-600">Time to be agreed</span>),
+      cell: (row) => (row.startsAt ? <span className="text-graphite-200">{formatDateTime(row.startsAt, user.timezone)}</span> : <span className="text-graphite-600">{T("Time to be agreed")}</span>),
     },
     { key: 'guests', header: 'Party', align: 'right', hideBelow: 'md', cell: (row) => <span className="text-graphite-300">{row.guests}</span> },
     { key: 'status', header: 'Status', cell: (row) => <Badge tone={toneForStatus(row.status)}>{humanise(row.status, STATUS_LABEL)}</Badge> },
@@ -123,7 +125,7 @@ export default async function LifestylePage({ searchParams }: { searchParams?: R
               propertyId: row.propertyId ?? '',
               notes: row.notes,
             }}
-            trigger={<span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">Edit</span>}
+            trigger={<span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">{T("Edit")}</span>}
           />
           <DeleteButton path={`/api/reservations/${row.id}`} label="Remove" title="Delete this request?" body="Removes it from your history entirely — including any reference you recorded." />
         </span>
@@ -141,9 +143,7 @@ export default async function LifestylePage({ searchParams }: { searchParams?: R
           <>
             <span>{requested.length} awaiting a venue</span>
             <span>{confirmed.length} confirmed</span>
-            <Link href="/travel" className="text-gold-200 transition-colors hover:text-gold-100">
-              Travel →
-            </Link>
+            <Link href="/travel" className="text-gold-200 transition-colors hover:text-gold-100">{T("Travel →")}</Link>
           </>
         }
         actions={
@@ -161,10 +161,7 @@ export default async function LifestylePage({ searchParams }: { searchParams?: R
       />
 
       {requested.length ? (
-        <Notice tone="attention" title={`${requested.length} request${requested.length === 1 ? '' : 's'} are with the office, not with you`}>
-          Each one is being chased. Where a venue has not answered, the status stays “requested” — the platform will not dress up a silence as a
-          booking.
-        </Notice>
+        <Notice tone="attention" title={`${requested.length} request${requested.length === 1 ? '' : 's'} are with the office, not with you`}>{T("Each one is being chased. Where a venue has not answered, the status stays “requested” — the platform will not dress up a silence as a booking.")}</Notice>
       ) : null}
 
       <StatStrip

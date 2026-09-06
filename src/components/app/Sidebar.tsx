@@ -7,6 +7,7 @@ import { X } from 'lucide-react';
 import { BrandLockup } from '@/components/brand';
 import { NAV_GROUPS, isActive } from '@/components/app/nav';
 import { cn, pluralise } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 export interface ShellUser {
   fullName: string;
@@ -31,6 +32,10 @@ export function Sidebar({
   planName: string;
 }) {
   const pathname = usePathname();
+  const T = useT();
+  // The navigation is authored once in nav.ts and reused by the drawer, the
+  // command palette and the breadcrumb, so the words are translated where they
+  // are shown — one dictionary entry covers every place they appear.
   const groups = NAV_GROUPS.filter((group) => group.items.some((item) => !item.admin || user.role === 'admin'));
 
   const body = (
@@ -61,7 +66,7 @@ export function Sidebar({
 
         {groups.map((group) => (
           <div key={group.title} className="mb-7 last:mb-0">
-            <p className="label mb-3 px-3 text-graphite-600">{group.title}</p>
+            <p className="label mb-3 px-3 text-graphite-600">{T(group.title)}</p>
             <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const active = isActive(pathname, item);
@@ -84,7 +89,7 @@ export function Sidebar({
                         )}
                       />
                       <Icon size={15} strokeWidth={1.4} className={cn('shrink-0 transition-colors duration-300', active ? 'text-gold-300' : 'text-graphite-500 group-hover:text-graphite-300')} />
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate">{T(item.label)}</span>
                     </Link>
                   </li>
                 );

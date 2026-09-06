@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { ApiClientError, apiRequest } from '@/lib/http/client';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 type Outcome = {
   conversationId?: string | null;
@@ -32,6 +33,7 @@ export function AssistantConsole({
   firstName: string;
   busyLabel?: string;
 }) {
+  const T = useT();
   const router = useRouter();
   const toast = useToast();
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -117,7 +119,7 @@ export function AssistantConsole({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-ivory-200/[0.07] px-6 py-4 sm:px-8">
-        <span className="label mr-1 text-graphite-600">Try</span>
+        <span className="label mr-1 text-graphite-600">{T("Try")}</span>
         {suggestions.map((suggestion) => (
           <button
             key={suggestion}
@@ -136,9 +138,7 @@ export function AssistantConsole({
           <span className={cn('text-[10.5px] tabular-nums tracking-[0.14em]', text.length > max - 80 ? 'text-gold-200' : 'text-graphite-600')}>
             {text.length}/{max}
           </span>
-          <Button size="md" onClick={send} loading={pending} icon={<ArrowUp size={13} strokeWidth={1.6} />}>
-            Send
-          </Button>
+          <Button size="md" onClick={send} loading={pending} icon={<ArrowUp size={13} strokeWidth={1.6} />}>{T("Send")}</Button>
         </span>
       </div>
     </div>

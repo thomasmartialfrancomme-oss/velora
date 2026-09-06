@@ -3,8 +3,10 @@ import { ArrowUpRight } from 'lucide-react';
 import { Section } from '@/components/marketing/section';
 import { Reveal } from '@/components/ui/reveal';
 import { MEMBERSHIP_PLANS, cn } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export function MembershipStrip() {
+  const T = getT();
   return (
     <Section
       id="membership"
@@ -18,9 +20,7 @@ export function MembershipStrip() {
       }
       lede="Membership is a service relationship, priced accordingly. Change, pause or cancel at any time from inside the platform."
       aside={
-        <Link href="/membership" className="group inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-gold-200 transition-colors hover:text-gold-100">
-          See what is included
-          <ArrowUpRight size={12} className="transition-transform duration-300 group-hover:translate-x-0.5" />
+        <Link href="/membership" className="group inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-gold-200 transition-colors hover:text-gold-100">{T("See what is included")}<ArrowUpRight size={12} className="transition-transform duration-300 group-hover:translate-x-0.5" />
         </Link>
       }
     >
@@ -31,12 +31,12 @@ export function MembershipStrip() {
               {plan.featured ? <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-400/70 to-transparent" /> : null}
               <div className="flex items-baseline justify-between gap-4">
                 <p className="font-serif text-[1.3rem] uppercase tracking-[0.16em] text-ivory-50">{plan.name}</p>
-                {plan.featured ? <span className="text-[9.5px] uppercase tracking-[0.24em] text-gold-300">Most chosen</span> : null}
+                {plan.featured ? <span className="text-[9.5px] uppercase tracking-[0.24em] text-gold-300">{T("Most chosen")}</span> : null}
               </div>
               <p className="mt-4 text-[13px] leading-relaxed text-graphite-300">{plan.positioning}</p>
               <p className="mt-8 font-serif text-[2.4rem] leading-none text-ivory-50">
                 {plan.price_label}
-                <span className="ml-2 font-sans text-[11px] uppercase tracking-[0.2em] text-graphite-400">/ month</span>
+                <span className="ml-2 font-sans text-[11px] uppercase tracking-[0.2em] text-graphite-400">{T("/ month")}</span>
               </p>
               <ul className="mt-8 space-y-3 border-t border-ivory-200/[0.07] pt-6 text-[13px] text-graphite-200">
                 {plan.features.slice(0, 5).map((feature) => (
@@ -48,9 +48,7 @@ export function MembershipStrip() {
               </ul>
               <div className="mt-9 flex items-center justify-between border-t border-ivory-200/[0.07] pt-5">
                 <span className="text-[10.5px] uppercase tracking-[0.2em] text-graphite-500">{plan.response_sla}</span>
-                <Link href={`/membership?plan=${plan.key}`} className="text-[11px] uppercase tracking-[0.2em] text-ivory-100 transition-colors hover:text-gold-200">
-                  Details →
-                </Link>
+                <Link href={`/membership?plan=${plan.key}`} className="text-[11px] uppercase tracking-[0.2em] text-ivory-100 transition-colors hover:text-gold-200">{T("Details →")}</Link>
               </div>
             </div>
           </Reveal>

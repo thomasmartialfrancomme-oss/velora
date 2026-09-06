@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils/format';
-import { getT } from '@/lib/i18n/server';;
+import { L10n } from '@/lib/i18n/context';
 
 export type Tone = 'neutral' | 'ok' | 'info' | 'attention' | 'risk' | 'gold';
 
@@ -32,7 +32,8 @@ export function Badge({
       )}
     >
       {dot ? <span className="h-1 w-1 rounded-full bg-current" /> : null}
-      {typeof children === 'string' ? getT()(children) : children}
+      {/* only a plain string is looked up: a badge around data keeps the text it was given */}
+      {typeof children === 'string' ? <L10n source={children} /> : children}
     </span>
   );
 }

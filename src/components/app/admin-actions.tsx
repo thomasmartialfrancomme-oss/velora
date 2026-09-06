@@ -9,10 +9,12 @@ import { SelectField, TextArea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { ApiClientError, apiRequest } from '@/lib/http/client';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 /* ============================================================ sub-nav */
 
 export function AdminSubnav({ items }: { items: { href: string; label: string; count?: number }[] }) {
+  const T = useT();
   const pathname = usePathname();
   return (
     <nav className="-mx-1 flex gap-1 overflow-x-auto border-b border-ivory-200/[0.08] px-1 no-scrollbar" aria-label="Private office console">
@@ -53,6 +55,7 @@ const REQUEST_STATUSES = [
 ];
 
 export function AccessRequestTriage({ id, applicant }: { id: string; applicant: string }) {
+  const T = useT();
   const toast = useToast();
   const [status, setStatus] = useState('reviewing');
   const [note, setNote] = useState('');
@@ -88,12 +91,8 @@ export function AccessRequestTriage({ id, applicant }: { id: string; applicant: 
       {error ? <p className="text-[12.5px] text-state-risk">{error}</p> : null}
 
       <div className="flex items-center justify-between gap-4">
-        <p className="max-w-md text-[11.5px] leading-relaxed text-graphite-500">
-          Inviting creates an account with no usable passphrase — only a reset link the applicant sets themselves. Nothing is emailed from this build.
-        </p>
-        <Button size="sm" loading={pending} onClick={() => void save()}>
-          Record decision
-        </Button>
+        <p className="max-w-md text-[11.5px] leading-relaxed text-graphite-500">{T("Inviting creates an account with no usable passphrase — only a reset link the applicant sets themselves. Nothing is emailed from this build.")}</p>
+        <Button size="sm" loading={pending} onClick={() => void save()}>{T("Record decision")}</Button>
       </div>
 
       {invite ? (
@@ -117,9 +116,7 @@ export function AccessRequestTriage({ id, applicant }: { id: string; applicant: 
               Copy
             </Button>
           </div>
-          <p className="mt-2.5 text-[11.5px] leading-relaxed text-graphite-400">
-            Valid fourteen days. The account stays in “invited” until the passphrase is chosen, so an undelivered link expires harmlessly.
-          </p>
+          <p className="mt-2.5 text-[11.5px] leading-relaxed text-graphite-400">{T("Valid fourteen days. The account stays in “invited” until the passphrase is chosen, so an undelivered link expires harmlessly.")}</p>
         </div>
       ) : null}
     </div>
@@ -136,6 +133,7 @@ const TICKET_STATUSES = [
 ];
 
 export function TicketReply({ id, requester, status, assignee }: { id: string; requester: string; status: string; assignee: string | null }) {
+  const T = useT();
   const toast = useToast();
   const [reply, setReply] = useState('');
   const [next, setNext] = useState(status === 'open' ? 'in_review' : 'answered');
@@ -175,10 +173,8 @@ export function TicketReply({ id, requester, status, assignee }: { id: string; r
       </div>
       {error ? <p className="text-[12.5px] text-state-risk">{error}</p> : null}
       <div className="flex items-center justify-between gap-4">
-        <p className="text-[11.5px] text-graphite-500">An answer written here appears in the member’s correspondence thread and message list.</p>
-        <Button size="sm" loading={pending} onClick={() => void save()}>
-          Save
-        </Button>
+        <p className="text-[11.5px] text-graphite-500">{T("An answer written here appears in the member’s correspondence thread and message list.")}</p>
+        <Button size="sm" loading={pending} onClick={() => void save()}>{T("Save")}</Button>
       </div>
     </div>
   );
@@ -186,6 +182,7 @@ export function TicketReply({ id, requester, status, assignee }: { id: string; r
 
 /** A quiet external link used in console panels. */
 export function ConsoleLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const T = useT();
   return (
     <Link href={href} className="group inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-gold-200 transition-colors hover:text-gold-100">
       {children}

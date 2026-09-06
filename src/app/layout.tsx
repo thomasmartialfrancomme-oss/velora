@@ -75,11 +75,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           {T('Skip to content')}
         </a>
-        <ToastProvider>
-          <I18nProvider locale={locale} table={localeTable(locale)}>
-            {children}
-          </I18nProvider>
-        </ToastProvider>
+        <I18nProvider locale={locale} table={localeTable(locale)}>
+          <ToastProvider>{children}</ToastProvider>
+        </I18nProvider>
       </body>
     </html>
   );

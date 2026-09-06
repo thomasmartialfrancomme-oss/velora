@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { ApiClientError, apiRequest } from '@/lib/http/client';
 import { COUNTRIES } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 const TIMEZONES = [
   'Europe/Monaco',
@@ -58,6 +59,7 @@ export function ProfileForm({
 }: {
   profile: { firstName: string; lastName: string; email: string; country: string | null; timezone: string; locale: string; currency: string; briefingTime: string };
 }) {
+  const T = useT();
   const router = useRouter();
   const toast = useToast();
   const { errors, setErrors, read } = useFormError();
@@ -94,9 +96,7 @@ export function ProfileForm({
       <TextField label="Daily briefing at" type="time" value={values.briefingTime} onChange={(e) => setValues({ ...values, briefingTime: e.target.value })} error={errors.briefingTime} hint="Local to your time zone. The office will not send anything outside it without asking." required />
       {errors.form ? <p className="text-[12.5px] text-state-risk">{errors.form}</p> : null}
       <div className="flex justify-end">
-        <Button onClick={save} loading={pending} size="md">
-          Save changes
-        </Button>
+        <Button onClick={save} loading={pending} size="md">{T("Save changes")}</Button>
       </div>
     </div>
   );
@@ -107,6 +107,7 @@ export function PreferencesForm({
 }: {
   preferences: { daily_briefing: boolean; property_alerts: boolean; travel_updates: boolean; expense_review: boolean; staff_requests: boolean; channel: string };
 }) {
+  const T = useT();
   const router = useRouter();
   const toast = useToast();
   const { errors, setErrors, read } = useFormError();
@@ -163,15 +164,14 @@ export function PreferencesForm({
 
       {errors.form ? <p className="pt-2 text-[12.5px] text-state-risk">{errors.form}</p> : null}
       <div className="flex justify-end pt-4">
-        <Button onClick={save} loading={pending} size="md">
-          Save preferences
-        </Button>
+        <Button onClick={save} loading={pending} size="md">{T("Save preferences")}</Button>
       </div>
     </div>
   );
 }
 
 export function PasswordForm() {
+  const T = useT();
   const router = useRouter();
   const toast = useToast();
   const { errors, setErrors, read } = useFormError();
@@ -207,16 +207,15 @@ export function PasswordForm() {
       <TextField label="Repeat new passphrase" type="password" autoComplete="new-password" value={values.confirm} onChange={(e) => setValues({ ...values, confirm: e.target.value })} error={errors.confirm} required />
       {errors.form ? <p className="text-[12.5px] text-state-risk">{errors.form}</p> : null}
       <div className="flex items-center justify-between gap-4">
-        <p className="text-[11.5px] leading-relaxed text-graphite-500">Changing it signs out every other device immediately.</p>
-        <Button type="submit" loading={pending} size="md">
-          Change passphrase
-        </Button>
+        <p className="text-[11.5px] leading-relaxed text-graphite-500">{T("Changing it signs out every other device immediately.")}</p>
+        <Button type="submit" loading={pending} size="md">{T("Change passphrase")}</Button>
       </div>
     </form>
   );
 }
 
 export function DataPanel({ email }: { email: string }) {
+  const T = useT();
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [password, setPassword] = useState('');
@@ -240,27 +239,21 @@ export function DataPanel({ email }: { email: string }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[4px] border border-ivory-200/[0.08] bg-ink-950/60 px-5 py-4">
         <div>
-          <p className="text-[13px] text-ivory-50">Export everything</p>
+          <p className="text-[13px] text-ivory-50">{T("Export everything")}</p>
           <p className="mt-1 max-w-md text-[12px] leading-relaxed text-graphite-400">
             One JSON file with every row held against {email} — residences, people, ledger, documents index, conversations, invoices. No request, no
             waiting.
           </p>
         </div>
-        <Button asLink href="/api/account/export" variant="secondary" size="sm" icon={<Download size={13} strokeWidth={1.4} />}>
-          Download
-        </Button>
+        <Button asLink href="/api/account/export" variant="secondary" size="sm" icon={<Download size={13} strokeWidth={1.4} />}>{T("Download")}</Button>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[4px] border border-state-risk/25 bg-state-risk/[0.04] px-5 py-4">
         <div>
-          <p className="text-[13px] text-ivory-50">Close the account and delete its records</p>
-          <p className="mt-1 max-w-md text-[12px] leading-relaxed text-graphite-400">
-            Removes your data from this deployment. Your passphrase is required again, and the action cannot be undone from the browser.
-          </p>
+          <p className="text-[13px] text-ivory-50">{T("Close the account and delete its records")}</p>
+          <p className="mt-1 max-w-md text-[12px] leading-relaxed text-graphite-400">{T("Removes your data from this deployment. Your passphrase is required again, and the action cannot be undone from the browser.")}</p>
         </div>
-        <Button variant="danger" size="sm" icon={<Trash2 size={13} strokeWidth={1.4} />} onClick={() => setConfirmOpen(true)}>
-          Delete my account
-        </Button>
+        <Button variant="danger" size="sm" icon={<Trash2 size={13} strokeWidth={1.4} />} onClick={() => setConfirmOpen(true)}>{T("Delete my account")}</Button>
       </div>
 
       <ConfirmDialog
@@ -276,8 +269,7 @@ export function DataPanel({ email }: { email: string }) {
           <div className="space-y-4">
             <p>
               This removes residences, people, vehicles, journeys, tasks, ledger entries, document records, conversations, invoices and notifications for{' '}
-              <span className="text-ivory-50">{email}</span>. Nothing is archived by us.
-            </p>
+              <span className="text-ivory-50">{email}</span>{T(". Nothing is archived by us.")}</p>
             <TextField label="Your passphrase" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
             {error ? <p className="text-[12.5px] text-state-risk">{error}</p> : null}
           </div>

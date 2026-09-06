@@ -9,6 +9,7 @@ import { TicketReply } from '@/components/app/admin-actions';
 import { requireAdmin } from '@/lib/auth/session';
 import { listTickets } from '@/lib/data/admin';
 import { formatDateTime, label as humanise, relativeTime, STATUS_LABEL } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Correspondence · Administration' };
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,7 @@ const PRIORITY_TONE: Record<string, 'neutral' | 'info' | 'gold' | 'risk'> = { lo
 const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
 
 export default async function AdminTicketsPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const admin = await requireAdmin();
   const status = typeof searchParams?.status === 'string' ? searchParams.status : 'open';
 
@@ -100,14 +102,14 @@ export default async function AdminTicketsPage({ searchParams }: { searchParams?
 
               {ticket.reply ? (
                 <div className="mt-5 rounded-[4px] border-l border-gold-400/45 bg-gold-400/[0.04] py-3.5 pl-4 pr-3.5">
-                  <SectionLabel className="mb-1.5 text-gold-300/90">Answer on file</SectionLabel>
+                  <SectionLabel className="mb-1.5 text-gold-300/90">{T("Answer on file")}</SectionLabel>
                   <p className="max-w-3xl text-[12.5px] leading-relaxed text-graphite-100">{ticket.reply}</p>
                 </div>
               ) : null}
 
               {ticket.status === 'closed' ? (
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-ivory-200/[0.07] pt-4">
-                  <p className="text-[11.5px] text-graphite-500">Closed. Reopen it if the member comes back to the same thread.</p>
+                  <p className="text-[11.5px] text-graphite-500">{T("Closed. Reopen it if the member comes back to the same thread.")}</p>
                   <QuickAction
                     path={`/api/admin/tickets/${ticket.id}`}
                     method="PATCH"

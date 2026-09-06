@@ -7,6 +7,7 @@ import { ArrowUpRight, CornerDownLeft, Search } from 'lucide-react';
 import { NAV_ITEMS } from '@/components/app/nav';
 import { apiRequest } from '@/lib/http/client';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 type Hit = { id: string; group: string; title: string; detail: string; href: string };
 type Row = { key: string; group: string; title: string; detail: string; href: string; kind: 'nav' | 'record' };
@@ -17,6 +18,7 @@ type Row = { key: string; group: string; title: string; detail: string; href: st
  * is scoped to the signed-in member on the server.
  */
 export function CommandPalette({ open, onClose, role }: { open: boolean; onClose: () => void; role: 'owner' | 'admin' | 'staff' }) {
+  const T = useT();
   const router = useRouter();
   const [term, setTerm] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
@@ -152,7 +154,7 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
                 spellCheck={false}
               />
               {searching ? <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-gold-400" /> : null}
-              <kbd className="hidden rounded-[3px] border border-ivory-200/12 px-1.5 py-0.5 text-[9.5px] tracking-[0.12em] text-graphite-500 sm:block">ESC</kbd>
+              <kbd className="hidden rounded-[3px] border border-ivory-200/12 px-1.5 py-0.5 text-[9.5px] tracking-[0.12em] text-graphite-500 sm:block">{T("ESC")}</kbd>
             </div>
 
             <div ref={listRef} className="max-h-[52vh] overflow-y-auto py-2">
@@ -162,7 +164,7 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
                     <>
                       Nothing in your records matches “{term.trim()}”.
                       <br />
-                      <span className="text-[11px] text-graphite-600">Only your own household is searched.</span>
+                      <span className="text-[11px] text-graphite-600">{T("Only your own household is searched.")}</span>
                     </>
                   ) : (
                     'Type two characters or more.'
@@ -174,7 +176,7 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
                   lastGroup = row.group;
                   return (
                     <div key={row.key}>
-                      {showGroup ? <p className="label mb-1 mt-2 px-5 pt-2 text-graphite-600">{row.group}</p> : null}
+                      {showGroup ? <p className="label mb-1 mt-2 px-5 pt-2 text-graphite-600">{T(row.group)}</p> : null}
                       <button
                         type="button"
                         data-index={index}
@@ -189,8 +191,8 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
                         )}
                       >
                         <span className="min-w-0 flex-1">
-                          <span className={cn('block truncate text-[13px]', cursor === index ? 'text-ivory-50' : 'text-graphite-200')}>{row.title}</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-graphite-500">{row.detail}</span>
+                          <span className={cn('block truncate text-[13px]', cursor === index ? 'text-ivory-50' : 'text-graphite-200')}>{T(row.title)}</span>
+                          <span className="mt-0.5 block truncate text-[11px] text-graphite-500">{T(row.detail)}</span>
                         </span>
                         {cursor === index ? (
                           row.kind === 'nav' ? (
@@ -208,10 +210,10 @@ export function CommandPalette({ open, onClose, role }: { open: boolean; onClose
 
             <div className="flex items-center justify-between gap-4 border-t border-ivory-200/[0.08] px-5 py-3 text-[10.5px] uppercase tracking-[0.16em] text-graphite-600">
               <span className="flex items-center gap-4">
-                <span>↑ ↓ to move</span>
-                <span>↵ to open</span>
+                <span>{T("↑ ↓ to move")}</span>
+                <span>{T("↵ to open")}</span>
               </span>
-              <span>Your records only</span>
+              <span>{T("Your records only")}</span>
             </div>
           </motion.div>
         </motion.div>

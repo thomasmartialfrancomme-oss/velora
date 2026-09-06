@@ -13,6 +13,7 @@ import { requireUser } from '@/lib/auth/session';
 import { listProperties, listStaff, listVehicles } from '@/lib/data/read';
 import { STAFF_STATUS, STATUS_LABEL, VEHICLE_KINDS, VEHICLE_STATUS, daysUntil, formatDate, label as humanise, relativeTime } from '@/lib/utils/format';
 import type { VehicleWithDetail } from '@/lib/data/read';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Vehicles' };
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ export const dynamic = 'force-dynamic';
 type Row = VehicleWithDetail;
 
 export default async function VehiclesPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const status = typeof searchParams?.status === 'string' ? searchParams.status : 'all';
   const kind = typeof searchParams?.kind === 'string' ? searchParams.kind : 'all';
@@ -113,7 +115,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams?: Re
             })()}
           </span>
         ) : (
-          <span className="text-graphite-600">Not scheduled</span>
+          <span className="text-graphite-600">{T("Not scheduled")}</span>
         ),
     },
     {
@@ -169,7 +171,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams?: Re
               insuranceExpiresAt: row.insuranceExpiresAt,
               notes: row.notes,
             }}
-            trigger={<span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">Edit</span>}
+            trigger={<span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">{T("Edit")}</span>}
           />
           <DeleteButton path={`/api/vehicles/${row.id}`} label="Remove" title={`Remove the ${row.make} ${row.model}?`} body="Servicing history for this vehicle is deleted with it. Nothing else is touched." />
         </span>
@@ -263,7 +265,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams?: Re
               }
             />
           ) : (
-            <p className="text-[12.5px] leading-relaxed text-graphite-400">Nothing scheduled.</p>
+            <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Nothing scheduled.")}</p>
           )}
         </Panel>
 
@@ -276,10 +278,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams?: Re
               value: staff.filter((person) => person.status === value).length,
             }))}
           />
-          <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">
-            A driver is only assigned to a vehicle when the car is insured, serviced and in the same country. The office will not stretch that rule to
-            make a plan look tidy.
-          </p>
+          <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">{T("A driver is only assigned to a vehicle when the car is insured, serviced and in the same country. The office will not stretch that rule to make a plan look tidy.")}</p>
         </Panel>
       </div>
     </div>

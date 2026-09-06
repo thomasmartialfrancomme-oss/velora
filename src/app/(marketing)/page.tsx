@@ -10,6 +10,7 @@ import { MembershipStrip } from '@/components/marketing/membership-strip';
 import { ClosingCta } from '@/components/marketing/closing-cta';
 import { Section } from '@/components/marketing/section';
 import { Reveal } from '@/components/ui/reveal';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = {
   title: 'VELORA PRIVATE — Your private world, intelligently managed',
@@ -39,6 +40,7 @@ const METHOD = [
 ];
 
 export default function LandingPage() {
+  const T = getT();
   return (
     <>
       <Hero />
@@ -64,11 +66,11 @@ export default function LandingPage() {
               <li className="group relative flex h-full flex-col justify-between bg-ink-950 p-8 transition-colors duration-500 ease-lux hover:bg-ink-900/70 sm:p-10">
                 <div className="flex items-baseline justify-between">
                   <span className="font-serif text-[2.6rem] leading-none text-ivory-100/12 transition-colors duration-500 group-hover:text-gold-400/35">{item.step}</span>
-                  <span className="text-[10px] uppercase tracking-[0.24em] text-graphite-500">{item.meta}</span>
+                  <span className="text-[10px] uppercase tracking-[0.24em] text-graphite-500">{T(item.meta)}</span>
                 </div>
                 <div className="mt-10">
-                  <h3 className="font-serif text-[1.3rem] uppercase tracking-[0.06em] text-ivory-50">{item.title}</h3>
-                  <p className="mt-4 text-[13.5px] leading-relaxed text-graphite-300">{item.body}</p>
+                  <h3 className="font-serif text-[1.3rem] uppercase tracking-[0.06em] text-ivory-50">{T(item.title)}</h3>
+                  <p className="mt-4 text-[13.5px] leading-relaxed text-graphite-300">{T(item.body)}</p>
                 </div>
               </li>
             </Reveal>
@@ -87,14 +89,9 @@ export default function LandingPage() {
       <section className="relative border-y border-ivory-200/[0.07] bg-ink-1000 py-20 sm:py-24">
         <div className="container">
           <Reveal className="mx-auto max-w-3xl text-center">
-            <p className="label mb-9 text-graphite-500">In practice</p>
-            <blockquote className="font-serif text-[clamp(1.5rem,3vw,2.35rem)] font-light leading-[1.35] text-ivory-100">
-              “We stopped keeping a spreadsheet of who is where, and what still needs chasing. The briefing simply knows — and when it does not know,
-              it says so.”
-            </blockquote>
-            <p className="mt-8 text-[11px] uppercase tracking-[0.26em] text-graphite-500">
-              Chief of staff · family office, six households
-            </p>
+            <p className="label mb-9 text-graphite-500">{T("In practice")}</p>
+            <blockquote className="font-serif text-[clamp(1.5rem,3vw,2.35rem)] font-light leading-[1.35] text-ivory-100">{T("“We stopped keeping a spreadsheet of who is where, and what still needs chasing. The briefing simply knows — and when it does not know, it says so.”")}</blockquote>
+            <p className="mt-8 text-[11px] uppercase tracking-[0.26em] text-graphite-500">{T("Chief of staff · family office, six households")}</p>
           </Reveal>
         </div>
       </section>

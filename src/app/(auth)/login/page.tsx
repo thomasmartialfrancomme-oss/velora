@@ -2,11 +2,13 @@ import { redirect } from 'next/navigation';
 import { LoginForm, type DemoAccount } from '@/components/auth/auth-forms';
 import { getCurrentUser } from '@/lib/auth/session';
 import { DEMO_CREDENTIALS } from '@db/demo-data.mjs';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata = { title: 'Sign in' };
 export const dynamic = 'force-dynamic';
 
 export default async function LoginPage() {
+  const T = getT();
   const user = await getCurrentUser();
   if (user) redirect('/dashboard');
 
@@ -31,15 +33,11 @@ export default async function LoginPage() {
   return (
     <>
       <header className="mb-9">
-        <p className="label mb-4 text-gold-300/80">Members</p>
-        <h1 className="font-serif text-[2.25rem] font-light uppercase tracking-[0.06em] leading-[1.08] text-ivory-50">
-          Welcome
-          <br />
+        <p className="label mb-4 text-gold-300/80">{T("Members")}</p>
+        <h1 className="font-serif text-[2.25rem] font-light uppercase tracking-[0.06em] leading-[1.08] text-ivory-50">{T("Welcome")}<br />
           back
         </h1>
-        <p className="mt-5 text-[13.5px] leading-relaxed text-graphite-300">
-          Sign in to reach your residences, people, travel and ledger. Sessions are held to this browser only.
-        </p>
+        <p className="mt-5 text-[13.5px] leading-relaxed text-graphite-300">{T("Sign in to reach your residences, people, travel and ledger. Sessions are held to this browser only.")}</p>
       </header>
       <LoginForm demoAccounts={demoAccounts} />
     </>

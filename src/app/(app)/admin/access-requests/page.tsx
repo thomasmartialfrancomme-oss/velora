@@ -9,6 +9,7 @@ import { AccessRequestTriage } from '@/components/app/admin-actions';
 import { requireAdmin } from '@/lib/auth/session';
 import { adminAccessRequests } from '@/lib/data/admin';
 import { formatDateTime, label as humanise, relativeTime, STATUS_LABEL } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Access queue · Administration' };
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,7 @@ export const dynamic = 'force-dynamic';
 const ORDER: Record<string, number> = { new: 0, reviewing: 1, invited: 2, declined: 3, archived: 4 };
 
 export default async function AdminAccessRequestsPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const admin = await requireAdmin();
   const status = typeof searchParams?.status === 'string' ? searchParams.status : 'open';
 
@@ -41,9 +43,7 @@ export default async function AdminAccessRequestsPage({ searchParams }: { search
           </>
         }
         actions={
-          <Link href="/access/request" className="text-[11px] uppercase tracking-[0.2em] text-gold-200 transition-colors hover:text-gold-100">
-            The form members see →
-          </Link>
+          <Link href="/access/request" className="text-[11px] uppercase tracking-[0.2em] text-gold-200 transition-colors hover:text-gold-100">{T("The form members see →")}</Link>
         }
       />
 
@@ -114,15 +114,13 @@ export default async function AdminAccessRequestsPage({ searchParams }: { search
 
                 {row.reviewerNote ? (
                   <p className="mt-5 rounded-[4px] border-l border-gold-400/45 bg-gold-400/[0.04] py-3 pl-4 pr-3 text-[12.5px] leading-relaxed text-graphite-100">
-                    <span className="label mr-2 text-gold-300/80">On file</span>
+                    <span className="label mr-2 text-gold-300/80">{T("On file")}</span>
                     {row.reviewerNote}
                   </p>
                 ) : null}
 
                 {row.status === 'declined' || row.status === 'archived' ? (
-                  <p className="mt-5 text-[11.5px] text-graphite-500">
-                    Closed. Reopen it by moving it to <span className="text-graphite-200">reviewing</span> — nothing is deleted from the queue, only marked.
-                  </p>
+                  <p className="mt-5 text-[11.5px] text-graphite-500">{T("Closed. Reopen it by moving it to")}<span className="text-graphite-200">reviewing</span>{T("— nothing is deleted from the queue, only marked.")}</p>
                 ) : null}
 
                 <AccessRequestTriage id={row.id} applicant={applicant || row.email} />

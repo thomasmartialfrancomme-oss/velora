@@ -7,6 +7,7 @@ import { RecordForm, type FieldSpec } from '@/components/ui/record-form';
 import { requireUser } from '@/lib/auth/session';
 import { getMembership, listMyTickets } from '@/lib/data/read';
 import { formatDateTime, getPlan, relativeTime } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'The office' };
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,7 @@ const STATUS_TONE: Record<string, 'neutral' | 'info' | 'gold' | 'ok'> = { open: 
 const STATUS_LABELS: Record<string, string> = { open: 'With the office', in_review: 'Being prepared', answered: 'Answered', closed: 'Closed' };
 
 export default async function SupportPage() {
+  const T = getT();
   const user = await requireUser();
   const tickets = listMyTickets(user.id);
   const membership = getMembership(user.id);
@@ -147,7 +149,7 @@ export default async function SupportPage() {
 
                     {ticket.reply ? (
                       <div className="mt-3.5 rounded-[3px] border-l border-gold-400/50 bg-gold-400/[0.04] py-3 pl-4 pr-3.5">
-                        <SectionLabel className="mb-1.5 text-gold-300/90">Answer from the office</SectionLabel>
+                        <SectionLabel className="mb-1.5 text-gold-300/90">{T("Answer from the office")}</SectionLabel>
                         <p className="text-[12.5px] leading-relaxed text-graphite-100">{ticket.reply}</p>
                         <p className="mt-2 text-[10.5px] uppercase tracking-[0.16em] text-graphite-600">
                           {ticket.assignee ?? 'The office'} · {formatDateTime(ticket.updatedAt, user.timezone)}
@@ -165,10 +167,7 @@ export default async function SupportPage() {
             )}
           </Panel>
 
-          <Notice tone="info" title="What happens when you send">
-            The request is stored against your account with a timestamp, an office member is assigned within your response window, the answer returns here in
-            the same thread, and anything the answer commits to opens as a task in the ledger. Nothing is sent to a third party from this screen.
-          </Notice>
+          <Notice tone="info" title="What happens when you send">{T("The request is stored against your account with a timestamp, an office member is assigned within your response window, the answer returns here in the same thread, and anything the answer commits to opens as a task in the ledger. Nothing is sent to a third party from this screen.")}</Notice>
         </div>
       </div>
     </div>

@@ -10,8 +10,10 @@ import type { ShellUser } from '@/components/app/Sidebar';
 import { titleForPath } from '@/components/app/nav';
 import { apiRequest } from '@/lib/http/client';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 function LocalClock({ timeZone }: { timeZone: string }) {
+  const T = useT();
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export function Topbar({
   onOpenMenu: () => void;
   onOpenPalette: () => void;
 }) {
+  const T = useT();
   const pathname = usePathname();
   const router = useRouter();
   const crumbs = titleForPath(pathname);
@@ -95,9 +98,9 @@ export function Topbar({
         </button>
 
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[11px] uppercase tracking-[0.18em]">
-          <span className="hidden text-graphite-600 sm:inline">{crumbs.group}</span>
+          <span className="hidden text-graphite-600 sm:inline">{T(crumbs.group)}</span>
           <ChevronRight size={11} className="hidden text-graphite-700 sm:inline" strokeWidth={1.4} />
-          <span className="truncate text-graphite-200">{crumbs.page}</span>
+          <span className="truncate text-graphite-200">{T(crumbs.page)}</span>
         </nav>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
@@ -107,7 +110,7 @@ export function Topbar({
             className="group hidden h-8 items-center gap-2.5 rounded-[3px] border border-ivory-200/[0.09] bg-ink-950/60 pl-3 pr-2.5 text-[11.5px] text-graphite-500 transition-all duration-300 hover:border-ivory-200/20 hover:text-graphite-200 md:flex"
           >
             <Search size={13} strokeWidth={1.4} />
-            <span>Search the office</span>
+            <span>{T("Search the office")}</span>
             <kbd className="ml-2 rounded-[2px] border border-ivory-200/12 px-1 py-px text-[9px] tracking-[0.1em] text-graphite-500">⌘K</kbd>
           </button>
           <button

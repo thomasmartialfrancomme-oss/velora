@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 export type FilterDef =
   | { key: string; label: string; type: 'search'; placeholder?: string }
@@ -14,6 +15,7 @@ export type FilterDef =
  * filtering happens on the server against the member's own records.
  */
 export function FilterBar({ filters, resultCount }: { filters: FilterDef[]; resultCount?: string }) {
+  const T = useT();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -64,8 +66,8 @@ export function FilterBar({ filters, resultCount }: { filters: FilterDef[]; resu
               <input
                 value={term}
                 onChange={(event) => setTerm(event.target.value)}
-                placeholder={filter.placeholder ?? filter.label}
-                aria-label={filter.label}
+                placeholder={T(filter.placeholder ?? filter.label)}
+                aria-label={T(filter.label)}
                 className="w-full border-b border-transparent bg-transparent pb-1.5 text-[13px] text-ivory-50 outline-none transition-colors duration-300 placeholder:text-graphite-600 focus:border-gold-400/50"
               />
             </div>
@@ -74,7 +76,7 @@ export function FilterBar({ filters, resultCount }: { filters: FilterDef[]; resu
         const value = params.get(filter.key) ?? 'all';
         return (
           <label key={filter.key} className="flex items-center gap-2.5">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-graphite-600">{filter.label}</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-graphite-600">{T(filter.label)}</span>
             <select
               value={value}
               onChange={(event) => push(filter.key, event.target.value)}
@@ -91,7 +93,7 @@ export function FilterBar({ filters, resultCount }: { filters: FilterDef[]; resu
             >
               {filter.options.map((option) => (
                 <option key={option.value} value={option.value} className="bg-ink-900 text-ivory-100">
-                  {option.label}
+                  {T(option.label)}
                 </option>
               ))}
             </select>

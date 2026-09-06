@@ -7,6 +7,7 @@ import { Bell } from 'lucide-react';
 import { NOTIFICATION_ICON } from '@/components/app/nav';
 import { apiRequest } from '@/lib/http/client';
 import { cn, relativeTime, truncate } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 type Note = {
   id: string;
@@ -21,6 +22,7 @@ type Note = {
 };
 
 export function NotificationsBell({ initialUnread }: { initialUnread: number }) {
+  const T = useT();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(initialUnread);
   const [items, setItems] = useState<Note[] | null>(null);
@@ -114,7 +116,7 @@ export function NotificationsBell({ initialUnread }: { initialUnread: number }) 
             className="absolute right-0 top-[calc(100%+10px)] z-50 w-[358px] origin-top-right overflow-hidden rounded-[6px] border border-ivory-200/[0.12] bg-ink-950/97 shadow-[0_28px_70px_-28px_rgba(0,0,0,0.85)] backdrop-blur-xl"
           >
             <div className="flex items-center justify-between border-b border-ivory-200/[0.08] px-5 py-3.5">
-              <p className="label text-graphite-300">Notifications</p>
+              <p className="label text-graphite-300">{T("Notifications")}</p>
               <button
                 type="button"
                 onClick={markAll}
@@ -186,10 +188,8 @@ export function NotificationsBell({ initialUnread }: { initialUnread: number }) 
                   );
                 })
               ) : (
-                <p className="px-5 py-9 text-center text-[12.5px] leading-relaxed text-graphite-500">
-                  Nothing needs your attention.
-                  <br />
-                  <span className="text-[11px] text-graphite-600">That is the point of the office.</span>
+                <p className="px-5 py-9 text-center text-[12.5px] leading-relaxed text-graphite-500">{T("Nothing needs your attention.")}<br />
+                  <span className="text-[11px] text-graphite-600">{T("That is the point of the office.")}</span>
                 </p>
               )}
             </div>

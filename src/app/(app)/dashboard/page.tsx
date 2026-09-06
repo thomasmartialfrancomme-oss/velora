@@ -11,6 +11,7 @@ import { getDashboardData } from '@/lib/data/analytics';
 import { listProperties, listStaff, listTasks, getMembership, pendingAiActions } from '@/lib/data/read';
 import { requireUser } from '@/lib/auth/session';
 import { formatMoney, formatDate, formatTime, relativeTime, label as humanise, STATUS_LABEL, greetingFor, STAFF_STATUS } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,7 @@ function hourIn(timeZone: string): number {
 }
 
 export default async function DashboardPage() {
+  const T = getT();
   const user = await requireUser();
   const data = getDashboardData(user);
   const properties = listProperties(user.id);
@@ -73,8 +75,7 @@ export default async function DashboardPage() {
         lede="Nothing here is a demo of a workflow — each row is your own record, and each action writes to it."
         meta={
           <>
-            <span>
-              Briefing at <span className="text-graphite-300">{user.briefingTime}</span>
+            <span>{T("Briefing at")}<span className="text-graphite-300">{user.briefingTime}</span>
             </span>
             <span>{user.timezone}</span>
             <Link href="/membership" className="text-gold-200 transition-colors hover:text-gold-100">
@@ -84,9 +85,7 @@ export default async function DashboardPage() {
         }
         actions={
           <>
-            <Button asLink href="/ai" variant="gold-outline" size="md" icon={<Sparkles size={13} strokeWidth={1.4} />}>
-              Ask VELORA AI
-            </Button>
+            <Button asLink href="/ai" variant="gold-outline" size="md" icon={<Sparkles size={13} strokeWidth={1.4} />}>{T("Ask VELORA AI")}</Button>
             <RecordForm
               title="New task"
               eyebrow="Your office"
@@ -107,14 +106,10 @@ export default async function DashboardPage() {
           action={
             <>
               {awaiting.length ? (
-                <Button asLink href="/dashboard#open-items" variant="secondary" size="sm">
-                  Review tasks
-                </Button>
+                <Button asLink href="/dashboard#open-items" variant="secondary" size="sm">{T("Review tasks")}</Button>
               ) : null}
               {aiPending.length ? (
-                <Button asLink href="/ai" variant="secondary" size="sm">
-                  Review proposed actions
-                </Button>
+                <Button asLink href="/ai" variant="secondary" size="sm">{T("Review proposed actions")}</Button>
               ) : null}
             </>
           }
@@ -140,7 +135,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
         <div className="space-y-6">
           <Panel>
-            <PanelHeader label="Today" title="Your day, in order" description={`${data.today.length} items the office considers worth your attention.`} actions={<Link href="/briefing" className="link-lux text-[11px] uppercase tracking-[0.2em] text-graphite-300 transition-colors hover:text-ivory-100">Full briefing →</Link>} />
+            <PanelHeader label="Today" title="Your day, in order" description={`${data.today.length} items the office considers worth your attention.`} actions={<Link href="/briefing" className="link-lux text-[11px] uppercase tracking-[0.2em] text-graphite-300 transition-colors hover:text-ivory-100">{T("Full briefing →")}</Link>} />
             <Divider className="my-5" />
             {data.today.length ? (
               <ul>
@@ -182,7 +177,7 @@ export default async function DashboardPage() {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] text-ivory-50">{task.title}</span>
                       <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-graphite-500">
-                        {task.propertyName ? <span>{task.propertyName}</span> : <span>No residence</span>}
+                        {task.propertyName ? <span>{task.propertyName}</span> : <span>{T("No residence")}</span>}
                         {task.staffName ? <span>· {task.staffName}</span> : null}
                         {task.dueAt ? <span>· {task.status === 'done' ? 'closed' : 'due'} {formatDate(task.dueAt, 'day')}</span> : null}
                       </span>
@@ -266,7 +261,7 @@ export default async function DashboardPage() {
           </Panel>
 
           <Panel>
-            <PanelHeader label="Next arrival" title={data.nextTrip ? data.nextTrip.title : 'Nothing booked'} description={data.nextTrip ? `${data.nextTrip.originCity} → ${data.nextTrip.destinationCity}` : undefined} actions={<Link href="/travel" className="link-lux text-[11px] uppercase tracking-[0.2em] text-graphite-300 transition-colors hover:text-ivory-100">Travel →</Link>} />
+            <PanelHeader label="Next arrival" title={data.nextTrip ? data.nextTrip.title : 'Nothing booked'} description={data.nextTrip ? `${data.nextTrip.originCity} → ${data.nextTrip.destinationCity}` : undefined} actions={<Link href="/travel" className="link-lux text-[11px] uppercase tracking-[0.2em] text-graphite-300 transition-colors hover:text-ivory-100">{T("Travel →")}</Link>} />
             {data.nextTrip ? (
               <>
                 <Divider className="my-5" />
@@ -290,18 +285,16 @@ export default async function DashboardPage() {
                     {data.nextTrip.pendingLegs} of {data.nextTrip.legCount} steps still need a counterparty’s confirmation.
                   </p>
                 ) : (
-                  <p className="mt-4 text-[11.5px] leading-relaxed text-state-ok">Every step is confirmed.</p>
+                  <p className="mt-4 text-[11.5px] leading-relaxed text-state-ok">{T("Every step is confirmed.")}</p>
                 )}
               </>
             ) : (
-              <p className="mt-4 text-[12.5px] leading-relaxed text-graphite-400">
-                Raise a journey in Travel and the office will assemble the arrival plan — transfer, handling, house ready, dinner booked.
-              </p>
+              <p className="mt-4 text-[12.5px] leading-relaxed text-graphite-400">{T("Raise a journey in Travel and the office will assemble the arrival plan — transfer, handling, house ready, dinner booked.")}</p>
             )}
           </Panel>
 
           <Panel>
-            <PanelHeader label="On site now" title="Who is where" actions={<Link href="/people" className="link-lux text-[11px] uppercase tracking-[0.2em] text-graphite-300 transition-colors hover:text-ivory-100">Directory →</Link>} />
+            <PanelHeader label="On site now" title="Who is where" actions={<Link href="/people" className="link-lux text-[11px] uppercase tracking-[0.2em] text-graphite-300 transition-colors hover:text-ivory-100">{T("Directory →")}</Link>} />
             <Divider className="my-5" />
             {data.staffOnSite.length ? (
               <ul className="space-y-2.5">
@@ -316,10 +309,10 @@ export default async function DashboardPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-graphite-400">No one is flagged as on site. Set availability in the directory.</p>
+              <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("No one is flagged as on site. Set availability in the directory.")}</p>
             )}
             <Divider className="my-5" />
-            <SectionLabel>Status of the household</SectionLabel>
+            <SectionLabel>{T("Status of the household")}</SectionLabel>
             <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2">
               {STAFF_STATUS.slice(0, 4).map((status) => (
                 <LedgerRow key={status} label={humanise(status, STATUS_LABEL)} value={staff.filter((person) => person.status === status).length} tone="muted" />
@@ -338,9 +331,7 @@ export default async function DashboardPage() {
                 { label: 'Last invoice', value: membership.invoices[0] ? relativeTime(membership.invoices[0].issuedAt) : '—' },
               ]}
             />
-            <Button asLink href="/membership" variant="secondary" size="sm" className="mt-5 w-full">
-              Manage membership
-            </Button>
+            <Button asLink href="/membership" variant="secondary" size="sm" className="mt-5 w-full">{T("Manage membership")}</Button>
           </Panel>
         </div>
       </div>

@@ -14,6 +14,7 @@ import { requireUser } from '@/lib/auth/session';
 import { getFinanceSummary, listExpenses, listProperties } from '@/lib/data/read';
 import type { ExpenseRow } from '@/lib/data/tables';
 import { EXPENSE_CATEGORY_LABELS, STATUS_LABEL, formatDate, formatMoney, label as humanise, monthKey } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Finance' };
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ function monthOptions(count = 12): { value: string; label: string }[] {
 }
 
 export default async function FinancePage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const months = monthOptions();
   const monthRaw = typeof searchParams?.month === 'string' ? searchParams.month : months[0].value;
@@ -75,7 +77,7 @@ export default async function FinancePage({ searchParams }: { searchParams?: Rec
       key: 'residence',
       header: 'Charged to',
       hideBelow: 'lg',
-      cell: (row) => (row.propertyId ? <Link href={`/properties/${row.propertyId}`} className="link-lux text-graphite-200 hover:text-ivory-50">{properties.find((property) => property.id === row.propertyId)?.name ?? 'Residence'}</Link> : <span className="text-graphite-600">Household</span>),
+      cell: (row) => (row.propertyId ? <Link href={`/properties/${row.propertyId}`} className="link-lux text-graphite-200 hover:text-ivory-50">{properties.find((property) => property.id === row.propertyId)?.name ?? 'Residence'}</Link> : <span className="text-graphite-600">{T("Household")}</span>),
     },
     { key: 'amount', header: 'Amount', align: 'right', cell: (row) => <span className="text-[13.5px] text-ivory-50">{formatMoney(row.amountCents, { currency: user.currency })}</span> },
     {
@@ -125,9 +127,7 @@ export default async function FinancePage({ searchParams }: { searchParams?: Rec
         }
         actions={
           <>
-            <Button asLink href="/documents" variant="ghost" size="md">
-              Invoices on file
-            </Button>
+            <Button asLink href="/documents" variant="ghost" size="md">{T("Invoices on file")}</Button>
             <RecordForm
               title="Record an expense"
               eyebrow="Ledger"
@@ -143,10 +143,7 @@ export default async function FinancePage({ searchParams }: { searchParams?: Rec
       />
 
       {isCurrentMonth && budgetPct !== null && budgetPct > 100 ? (
-        <Notice tone="attention" title={`Recorded spend is ${budgetPct}% of the monthly budget you set`}>
-          The figure is what has been entered across your residences this month. Where a budget is exceeded, the office writes to you rather than
-          adjusting it.
-        </Notice>
+        <Notice tone="attention" title={`Recorded spend is ${budgetPct}% of the monthly budget you set`}>{T("The figure is what has been entered across your residences this month. Where a budget is exceeded, the office writes to you rather than adjusting it.")}</Notice>
       ) : null}
 
       <StatStrip
@@ -262,7 +259,7 @@ export default async function FinancePage({ searchParams }: { searchParams?: Rec
                   </li>
                 );
               })}
-              {!summary.byProperty.length ? <li className="text-[12.5px] text-graphite-500">Nothing to distribute.</li> : null}
+              {!summary.byProperty.length ? <li className="text-[12.5px] text-graphite-500">{T("Nothing to distribute.")}</li> : null}
             </ul>
           </Panel>
 
@@ -287,12 +284,9 @@ export default async function FinancePage({ searchParams }: { searchParams?: Rec
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-graphite-400">
-                Nothing is waiting on you. Entries become “pending” only when someone records them that way or the office cannot match them to a
-                residence.
-              </p>
+              <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Nothing is waiting on you. Entries become “pending” only when someone records them that way or the office cannot match them to a residence.")}</p>
             )}
-            <SectionLabel className="mt-6">Largest entries this month</SectionLabel>
+            <SectionLabel className="mt-6">{T("Largest entries this month")}</SectionLabel>
             <ul className="mt-3 space-y-2">
               {summary.largest.slice(0, 3).map((entry) => (
                 <li key={`${entry.description}-${entry.amountCents}`} className="flex items-baseline justify-between gap-4 text-[12px]">
@@ -309,10 +303,7 @@ export default async function FinancePage({ searchParams }: { searchParams?: Rec
         </div>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-graphite-600">
-        Amounts are stored in whole cents, so the arithmetic you see is the arithmetic that ran. Invoices and their PDFs belong in Documents — the ledger
-        line and the paper reference each other by residence, not by a filename.
-      </p>
+      <p className="text-[11.5px] leading-relaxed text-graphite-600">{T("Amounts are stored in whole cents, so the arithmetic you see is the arithmetic that ran. Invoices and their PDFs belong in Documents — the ledger line and the paper reference each other by residence, not by a filename.")}</p>
     </div>
   );
 }

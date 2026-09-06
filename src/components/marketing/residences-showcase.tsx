@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 import { Section } from '@/components/marketing/section';
-import { RawBadge as Badge, StatusDot } from '@/components/ui/badge';
+import { Badge, StatusDot } from '@/components/ui/badge';
 import { cn, formatMoney } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 /**
  * Demonstration dashboard for the marketing page. Illustrative figures only —
@@ -126,6 +127,7 @@ const PROPERTIES: DemoProperty[] = [
 ];
 
 export function ResidencesShowcase() {
+  const T = useT();
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const reduce = useReducedMotion();
@@ -167,7 +169,7 @@ export function ResidencesShowcase() {
         onMouseLeave={() => setPaused(false)}
       >
         <div className="order-2 lg:order-1">
-          <p className="label mb-6 text-graphite-400">Private residences</p>
+          <p className="label mb-6 text-graphite-400">{T("Private residences")}</p>
           <ul className="relative space-y-px" role="tablist" aria-label="Residences">
             {PROPERTIES.map((item, index) => {
               const selected = index === active;
@@ -237,7 +239,7 @@ export function ResidencesShowcase() {
               </div>
 
               <div className="mt-10 border-t border-ivory-200/[0.07] pt-6">
-                <p className="label mb-4 text-graphite-400">Next tasks</p>
+                <p className="label mb-4 text-graphite-400">{T("Next tasks")}</p>
                 <ul className="space-y-3">
                   {property.tasks.map((task, index) => (
                     <motion.li
@@ -263,7 +265,7 @@ export function ResidencesShowcase() {
               </div>
 
               <footer className="mt-9 flex items-center justify-between border-t border-ivory-200/[0.07] pt-5 text-[11.5px] uppercase tracking-[0.18em] text-graphite-500">
-                <span>Illustration · live product reads your records</span>
+                <span>{T("Illustration · live product reads your records")}</span>
                 <span className="tabular-nums">ref {String(active + 1).padStart(2, '0')} / {String(PROPERTIES.length).padStart(2, '0')}</span>
               </footer>
             </motion.article>

@@ -12,6 +12,7 @@ import { requireUser } from '@/lib/auth/session';
 import { listProperties, listStaff, listTasks } from '@/lib/data/read';
 import type { PropertyRow } from '@/lib/data/tables';
 import { COUNTRIES, PROPERTY_KINDS, PROPERTY_STATUS, daysUntil, formatMoney, formatDate, label as humanise, STATUS_LABEL, truncate } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Properties' };
 export const dynamic = 'force-dynamic';
@@ -39,6 +40,7 @@ function fieldsFor(properties: { id: string; name: string }[]): FieldSpec[] {
 }
 
 export default async function PropertiesPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const q = typeof searchParams?.q === 'string' ? searchParams.q : '';
   const status = typeof searchParams?.status === 'string' ? searchParams.status : 'all';
@@ -78,7 +80,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams?: 
             <span className="flex items-center gap-2.5">
               <StatusDot status={row.status} />
               <span className={row.isPrimary ? 'text-ivory-50' : 'text-ivory-100'}>{row.name}</span>
-              {row.isPrimary ? <Badge tone="gold">Primary</Badge> : null}
+              {row.isPrimary ? <Badge tone="gold">{T("Primary")}</Badge> : null}
             </span>
           }
           detail={`${row.city} · ${row.country} · ${humanise(row.kind, STATUS_LABEL)}`}
@@ -99,7 +101,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams?: 
             {row.nextServiceDays !== null ? <span className="ml-2 text-[11px] text-graphite-600">{row.nextServiceDays < 0 ? `${Math.abs(row.nextServiceDays)}d overdue` : `in ${row.nextServiceDays}d`}</span> : null}
           </span>
         ) : (
-          <span className="text-graphite-600">Not scheduled</span>
+          <span className="text-graphite-600">{T("Not scheduled")}</span>
         ),
     },
     {
@@ -120,9 +122,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams?: 
       width: '6rem',
       cell: (row) => (
         <span className="relative z-10 inline-flex items-center gap-1.5">
-          <Link href={`/properties/${row.id}`} className="text-[10.5px] uppercase tracking-[0.18em] text-gold-200 transition-colors hover:text-gold-100">
-            Dossier →
-          </Link>
+          <Link href={`/properties/${row.id}`} className="text-[10.5px] uppercase tracking-[0.18em] text-gold-200 transition-colors hover:text-gold-100">{T("Dossier →")}</Link>
         </span>
       ),
     },
@@ -142,9 +142,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams?: 
         }
         actions={
           <>
-            <Button asLink href="/finance" variant="ghost" size="md">
-              Expenditure
-            </Button>
+            <Button asLink href="/finance" variant="ghost" size="md">{T("Expenditure")}</Button>
             <RecordForm
               title="Add residence"
               eyebrow="Property"
@@ -195,10 +193,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams?: 
         }
       />
 
-      <p className="text-[11.5px] leading-relaxed text-graphite-600">
-        Spend is what has been recorded in Finance for that residence — nothing is estimated. A budget figure is your own instruction to the office, not
-        a forecast.
-      </p>
+      <p className="text-[11.5px] leading-relaxed text-graphite-600">{T("Spend is what has been recorded in Finance for that residence — nothing is estimated. A budget figure is your own instruction to the office, not a forecast.")}</p>
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { DataPanel, PasswordForm, PreferencesForm, ProfileForm } from '@/compone
 import { requireUser } from '@/lib/auth/session';
 import { getMembership, listAuditForUser } from '@/lib/data/read';
 import { formatDate, formatDateTime, getPlan, label as humanise, relativeTime, STATUS_LABEL } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
+import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 
 export const metadata: Metadata = { title: 'Settings' };
 export const dynamic = 'force-dynamic';
@@ -21,6 +23,7 @@ const TABS = [
 ];
 
 export default async function SettingsPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const tabRaw = typeof searchParams?.tab === 'string' ? searchParams.tab : 'profile';
   const tab = TABS.some((entry) => entry.value === tabRaw) ? tabRaw : 'profile';
@@ -73,6 +76,15 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Re
                   briefingTime: user.briefingTime,
                 }}
               />
+              <Divider />
+              <div className="flex flex-wrap items-center justify-between gap-5 px-7 py-6">
+                <div className="max-w-md">
+                  <p className="text-[13px] leading-relaxed text-graphite-300">
+                    {T('This changes the words around your data, never the data. Anything not yet translated in your language shows in English rather than being guessed at.')}
+                  </p>
+                </div>
+                <LocaleSwitcher compact />
+              </div>
             </Panel>
           ) : null}
 
@@ -91,10 +103,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Re
                 <Divider className="my-5" />
                 <PasswordForm />
               </Panel>
-              <Notice tone="info" title="Two-factor with a hardware key is designed, not yet shipped">
-                Sessions are bound to a signed HttpOnly cookie, state-changing requests are origin-checked, and authentication endpoints are rate limited.
-                Security keys arrive with the platform’s next release — see the security document for what is and is not in place today.
-              </Notice>
+              <Notice tone="info" title="Two-factor with a hardware key is designed, not yet shipped">{T("Sessions are bound to a signed HttpOnly cookie, state-changing requests are origin-checked, and authentication endpoints are rate limited. Security keys arrive with the platform’s next release — see the security document for what is and is not in place today.")}</Notice>
             </>
           ) : null}
 
@@ -120,13 +129,8 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Re
                   { label: 'Line', value: '+377 93 00 00 00' },
                 ]}
               />
-              <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">
-                These names belong to the demonstration office. In a real membership they are the three people assigned to your household, and the number
-                reaches their duty rota.
-              </p>
-              <Link href="/support" className="mt-5 inline-block text-[11px] uppercase tracking-[0.2em] text-gold-200 transition-colors hover:text-gold-100">
-                Write to the office →
-              </Link>
+              <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">{T("These names belong to the demonstration office. In a real membership they are the three people assigned to your household, and the number reaches their duty rota.")}</p>
+              <Link href="/support" className="mt-5 inline-block text-[11px] uppercase tracking-[0.2em] text-gold-200 transition-colors hover:text-gold-100">{T("Write to the office →")}</Link>
             </Panel>
           ) : null}
         </div>
@@ -162,7 +166,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Re
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-graphite-400">Nothing recorded yet in this account.</p>
+              <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Nothing recorded yet in this account.")}</p>
             )}
           </Panel>
 

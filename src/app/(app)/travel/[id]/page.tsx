@@ -10,6 +10,7 @@ import { DeleteButton, RecordForm, QuickAction, type FieldSpec } from '@/compone
 import { requireUser } from '@/lib/auth/session';
 import { getTrip, listProperties } from '@/lib/data/read';
 import { STATUS_LABEL, TRAVEL_MODES, TRIP_STATUS, formatDate, formatDateTime, formatTime, label as humanise, relativeTime } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 }
 
 export default async function JourneyPage({ params }: { params: { id: string } }) {
+  const T = getT();
   const user = await requireUser();
   const trip = getTrip(user.id, params.id);
   if (!trip) notFound();
@@ -225,11 +227,8 @@ export default async function JourneyPage({ params }: { params: { id: string } }
             </ol>
           ) : (
             <div className="text-center">
-              <SectionLabel>The plan is empty</SectionLabel>
-              <p className="mx-auto mt-3 max-w-sm text-[12.5px] leading-relaxed text-graphite-400">
-                Edit the journey and add the steps a household needs around an arrival: the transfer, the handling at the gate, the house opened, dinner
-                held, a car fuelled.
-              </p>
+              <SectionLabel>{T("The plan is empty")}</SectionLabel>
+              <p className="mx-auto mt-3 max-w-sm text-[12.5px] leading-relaxed text-graphite-400">{T("Edit the journey and add the steps a household needs around an arrival: the transfer, the handling at the gate, the house opened, dinner held, a car fuelled.")}</p>
             </div>
           )}
         </Panel>
@@ -268,9 +267,7 @@ export default async function JourneyPage({ params }: { params: { id: string } }
                 </li>
               ))}
             </ul>
-            <Button asLink href="/lifestyle" variant="secondary" size="sm" className="mt-6 w-full">
-              Requests for this trip
-            </Button>
+            <Button asLink href="/lifestyle" variant="secondary" size="sm" className="mt-6 w-full">{T("Requests for this trip")}</Button>
           </Panel>
         </div>
       </div>

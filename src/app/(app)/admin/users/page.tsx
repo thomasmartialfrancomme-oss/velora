@@ -9,11 +9,13 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { requireAdmin } from '@/lib/auth/session';
 import { adminUserDetail, adminUsers } from '@/lib/data/admin';
 import { formatDateTime, label as humanise, relativeTime, STATUS_LABEL } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Accounts · Administration' };
 export const dynamic = 'force-dynamic';
 
 export default async function AdminUsersPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const admin = await requireAdmin();
   const q = typeof searchParams?.q === 'string' ? searchParams.q.slice(0, 60) : '';
   const status = typeof searchParams?.status === 'string' ? searchParams.status : 'all';
@@ -113,7 +115,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
                         {focus === row.id ? 'Hide detail' : 'Detail'}
                       </Link>
                       {isSelf ? (
-                        <span className="text-[10.5px] uppercase tracking-[0.16em] text-graphite-600">Your account</span>
+                        <span className="text-[10.5px] uppercase tracking-[0.16em] text-graphite-600">{T("Your account")}</span>
                       ) : (
                         <>
                           {row.status === 'suspended' ? (
@@ -136,10 +138,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
                               confirm={{
                                 title: `Suspend ${row.name}?`,
                                 body: (
-                                  <p>
-                                    Sign-out is immediate and the account cannot authenticate until it is reinstated here. Records are untouched — a
-                                    suspension is not a deletion.
-                                  </p>
+                                  <p>{T("Sign-out is immediate and the account cannot authenticate until it is reinstated here. Records are untouched — a suspension is not a deletion.")}</p>
                                 ),
                                 confirmLabel: 'Suspend the account',
                               }}
@@ -193,15 +192,13 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
             title={`${String(detail.user.first_name ?? '')} ${String(detail.user.last_name ?? '')}`.trim() || 'Account'}
             description="The shape of an account — how much is held and what was recently done. Contents are not shown here by design."
             actions={
-              <Link href="/admin/users" className="text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">
-                Close
-              </Link>
+              <Link href="/admin/users" className="text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">{T("Close")}</Link>
             }
           />
           <Divider className="my-5" />
           <div className="grid gap-6 lg:grid-cols-3">
             <div>
-              <SectionLabel className="mb-3 text-graphite-500">Standing</SectionLabel>
+              <SectionLabel className="mb-3 text-graphite-500">{T("Standing")}</SectionLabel>
               <KeyValue
                 items={[
                   { label: 'Email', value: String(detail.user.email ?? '') },
@@ -214,7 +211,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
               />
             </div>
             <div>
-              <SectionLabel className="mb-3 text-graphite-500">What they hold</SectionLabel>
+              <SectionLabel className="mb-3 text-graphite-500">{T("What they hold")}</SectionLabel>
               <KeyValue
                 items={[
                   { label: 'Residences', value: (detail.properties as unknown[]).length },
@@ -237,7 +234,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
               ) : null}
             </div>
             <div>
-              <SectionLabel className="mb-3 text-graphite-500">Recent trail</SectionLabel>
+              <SectionLabel className="mb-3 text-graphite-500">{T("Recent trail")}</SectionLabel>
               {(detail.audit as unknown[]).length ? (
                 <ul className="space-y-2.5">
                   {(detail.audit as { event: string; target: string | null; created_at: string }[]).slice(0, 8).map((entry, index) => (
@@ -248,16 +245,13 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
                   ))}
                 </ul>
               ) : (
-                <p className="text-[12.5px] leading-relaxed text-graphite-400">No recorded actions.</p>
+                <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("No recorded actions.")}</p>
               )}
             </div>
           </div>
         </Panel>
       ) : (
-        <Notice tone="info" title="Reading an account is not an administrator’s job">
-          Selecting an account shows its standing and how much it holds, never the contents. A member’s residences, ledger, documents and conversations are
-          readable only by that member and by the office staff they have expressly shared a record with.
-        </Notice>
+        <Notice tone="info" title="Reading an account is not an administrator’s job">{T("Selecting an account shows its standing and how much it holds, never the contents. A member’s residences, ledger, documents and conversations are readable only by that member and by the office staff they have expressly shared a record with.")}</Notice>
       )}
     </div>
   );

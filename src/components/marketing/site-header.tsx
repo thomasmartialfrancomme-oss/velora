@@ -8,6 +8,8 @@ import { ArrowUpRight, Menu, X } from 'lucide-react';
 import { BrandLockup } from '@/components/brand';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
+import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 
 const LINKS = [
   { href: '/#office', label: 'The Office' },
@@ -18,6 +20,7 @@ const LINKS = [
 ];
 
 export function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
+  const T = useT();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -50,25 +53,21 @@ export function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
               href={link.href}
               className="group relative text-[11px] uppercase tracking-[0.22em] text-graphite-200 transition-colors duration-300 hover:text-ivory-50"
             >
-              {link.label}
+              {T(link.label)}
               <span className="absolute -bottom-1.5 left-0 h-px w-full origin-left scale-x-0 bg-gold-400/70 transition-transform duration-500 ease-lux group-hover:scale-x-100" />
             </Link>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-4 md:flex">
+          <LocaleSwitcher compact className="hidden lg:flex" />
+          <span aria-hidden className="h-4 w-px bg-ivory-200/10" />
           {signedIn ? (
-            <Button href="/dashboard" variant="primary" size="sm" trailingIcon={<ArrowUpRight size={13} strokeWidth={1.4} />}>
-              Open dashboard
-            </Button>
+            <Button href="/dashboard" variant="primary" size="sm" trailingIcon={<ArrowUpRight size={13} strokeWidth={1.4} />}>{T("Open dashboard")}</Button>
           ) : (
             <>
-              <Button href="/login" variant="ghost" size="sm" asLink>
-                Sign in
-              </Button>
-              <Button href="/access/request" variant="gold-outline" size="sm" asLink>
-                Request private access
-              </Button>
+              <Button href="/login" variant="ghost" size="sm" asLink>{T("Sign in")}</Button>
+              <Button href="/access/request" variant="gold-outline" size="sm" asLink>{T("Request private access")}</Button>
             </>
           )}
         </div>
@@ -113,17 +112,12 @@ export function SiteHeader({ signedIn = false }: { signedIn?: boolean }) {
               ))}
               <div className="mt-6 flex flex-col gap-3">
                 {signedIn ? (
-                  <Button href="/dashboard" variant="primary" size="md" asLink>
-                    Open dashboard
-                  </Button>
+                  <Button href="/dashboard" variant="primary" size="md" asLink>{T("Open dashboard")}</Button>
                 ) : (
                   <>
-                    <Button href="/login" variant="secondary" size="md" asLink>
-                      Sign in
-                    </Button>
-                    <Button href="/access/request" variant="gold-outline" size="md" asLink>
-                      Request private access
-                    </Button>
+                    <LocaleSwitcher className="pt-2" />
+                    <Button href="/login" variant="secondary" size="md" asLink>{T("Sign in")}</Button>
+                    <Button href="/access/request" variant="gold-outline" size="md" asLink>{T("Request private access")}</Button>
                   </>
                 )}
               </div>

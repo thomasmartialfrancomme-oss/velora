@@ -12,6 +12,7 @@ import { requireUser } from '@/lib/auth/session';
 import { listProperties, listStaff, listTasks } from '@/lib/data/read';
 import { STAFF_ROLES, STAFF_STATUS, STATUS_LABEL, label as humanise, relativeTime, truncate } from '@/lib/utils/format';
 import type { StaffWithProperty } from '@/lib/data/read';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'People' };
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export const dynamic = 'force-dynamic';
 type Row = StaffWithProperty;
 
 export default async function PeoplePage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const q = typeof searchParams?.q === 'string' ? searchParams.q : '';
   const role = typeof searchParams?.role === 'string' ? searchParams.role : 'all';
@@ -90,7 +92,7 @@ export default async function PeoplePage({ searchParams }: { searchParams?: Reco
         </span>
       ),
     },
-    { key: 'base', header: 'Based at', hideBelow: 'md', cell: (row) => (row.propertyName ? <Link href={`/properties/${row.propertyId}`} className="link-lux text-graphite-200 hover:text-ivory-50">{row.propertyName}</Link> : <span className="text-graphite-600">Floating</span>) },
+    { key: 'base', header: 'Based at', hideBelow: 'md', cell: (row) => (row.propertyName ? <Link href={`/properties/${row.propertyId}`} className="link-lux text-graphite-200 hover:text-ivory-50">{row.propertyName}</Link> : <span className="text-graphite-600">{T("Floating")}</span>) },
     { key: 'open', header: 'Open', align: 'right', hideBelow: 'lg', cell: (row) => <span className={row.openTaskCount ? 'text-gold-200' : 'text-graphite-600'}>{row.openTaskCount || '—'}</span> },
     {
       key: 'next',
@@ -102,7 +104,7 @@ export default async function PeoplePage({ searchParams }: { searchParams?: Reco
             {truncate(row.nextTask, 52)}
           </span>
         ) : (
-          <span className="text-graphite-600">Nothing assigned</span>
+          <span className="text-graphite-600">{T("Nothing assigned")}</span>
         ),
     },
     {
@@ -145,9 +147,7 @@ export default async function PeoplePage({ searchParams }: { searchParams?: Reco
               notes: row.notes,
             }}
             trigger={
-              <span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">
-                Edit
-              </span>
+              <span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">{T("Edit")}</span>
             }
           />
           <DeleteButton
@@ -183,9 +183,7 @@ export default async function PeoplePage({ searchParams }: { searchParams?: Reco
         }
         actions={
           <>
-            <Button asLink href="/properties" variant="ghost" size="md">
-              By residence
-            </Button>
+            <Button asLink href="/properties" variant="ghost" size="md">{T("By residence")}</Button>
             <RecordForm
               title="Add a person"
               eyebrow="Directory"
@@ -236,9 +234,7 @@ export default async function PeoplePage({ searchParams }: { searchParams?: Reco
         }
       />
 
-      <p className="text-[11.5px] leading-relaxed text-graphite-600">
-        “Last heard” is the timestamp the office recorded on the most recent activity for that person. It is never inferred from their tasks.
-      </p>
+      <p className="text-[11.5px] leading-relaxed text-graphite-600">{T("“Last heard” is the timestamp the office recorded on the most recent activity for that person. It is never inferred from their tasks.")}</p>
     </div>
   );
 }

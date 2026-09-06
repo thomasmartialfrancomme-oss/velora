@@ -9,11 +9,13 @@ import { requireUser } from '@/lib/auth/session';
 import { buildBriefing } from '@/lib/data/analytics';
 import { listTasks, unreadCount } from '@/lib/data/read';
 import { formatTime } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Daily briefing' };
 export const dynamic = 'force-dynamic';
 
 export default async function BriefingPage() {
+  const T = getT();
   const user = await requireUser();
   const briefing = buildBriefing({ id: user.id, firstName: user.firstName, timezone: user.timezone, briefingTime: user.briefingTime });
   const unread = unreadCount(user.id);
@@ -36,9 +38,7 @@ export default async function BriefingPage() {
         }
         actions={
           <>
-            <Button asLink href="/settings?tab=notifications" variant="ghost" size="md">
-              Adjust the hour
-            </Button>
+            <Button asLink href="/settings?tab=notifications" variant="ghost" size="md">{T("Adjust the hour")}</Button>
             {unread ? (
               <QuickAction path="/api/notifications" body={{ all: true }} label={`Mark ${unread} read`} variant="secondary" size="md" successMessage="Your message list is clear." />
             ) : (
@@ -56,7 +56,7 @@ export default async function BriefingPage() {
 
           <header className="flex items-baseline justify-between gap-6 border-b border-ivory-200/[0.08] pb-6">
             <div>
-              <p className="label text-gold-300/80">VELORA PRIVATE · Daily briefing</p>
+              <p className="label text-gold-300/80">{T("VELORA PRIVATE · Daily briefing")}</p>
               <h2 className="mt-4 font-serif text-[1.9rem] font-light uppercase leading-[1.12] tracking-[0.04em] text-ivory-50">{briefing.greeting}</h2>
             </div>
             <p className="shrink-0 text-right text-[11px] uppercase tracking-[0.18em] text-graphite-500">
@@ -70,7 +70,7 @@ export default async function BriefingPage() {
 
           {briefing.priority ? (
             <section className="mt-9 rounded-[4px] border-l border-gold-400/50 bg-gold-400/[0.04] py-5 pl-6 pr-5">
-              <p className="label mb-2.5 text-gold-300/90">Needs your word</p>
+              <p className="label mb-2.5 text-gold-300/90">{T("Needs your word")}</p>
               <p className="text-[14px] leading-snug text-ivory-50">{briefing.priority.title}</p>
               <p className="mt-2 max-w-xl text-[12.5px] leading-relaxed text-graphite-300">{briefing.priority.detail}</p>
               <Link href={briefing.priority.actionHref} className="mt-4 inline-block text-[11px] uppercase tracking-[0.2em] text-gold-200 transition-colors hover:text-gold-100">
@@ -106,7 +106,7 @@ export default async function BriefingPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-[12.5px] leading-relaxed text-graphite-600">Nothing to report.</p>
+                  <p className="text-[12.5px] leading-relaxed text-graphite-600">{T("Nothing to report.")}</p>
                 )}
               </section>
             ))}
@@ -148,16 +148,12 @@ export default async function BriefingPage() {
                 {overdue.slice(0, 6).map((task) => (
                   <li key={task.id} className="flex items-baseline justify-between gap-4 text-[12.5px]">
                     <span className="min-w-0 truncate text-graphite-100">{task.title}</span>
-                    <Link href="/dashboard#open-items" className="shrink-0 text-[10.5px] uppercase tracking-[0.16em] text-gold-200 hover:text-gold-100">
-                      Review
-                    </Link>
+                    <Link href="/dashboard#open-items" className="shrink-0 text-[10.5px] uppercase tracking-[0.16em] text-gold-200 hover:text-gold-100">{T("Review")}</Link>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-[12.5px] leading-relaxed text-graphite-400">
-                Every open item is inside its own date. The office will tell you the moment that stops being true.
-              </p>
+              <p className="text-[12.5px] leading-relaxed text-graphite-400">{T("Every open item is inside its own date. The office will tell you the moment that stops being true.")}</p>
             )}
           </Panel>
 

@@ -2,7 +2,7 @@
 
 import { useId, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { useT } from '@/lib/i18n/context';
+import { useLocale, useT } from '@/lib/i18n/context';
 import { LOCALES, LOCALE_META, type Locale } from '@/lib/i18n/locales';
 import { cn } from '@/lib/utils/format';
 
@@ -20,19 +20,23 @@ export function LocaleSwitcher({
   className,
   compact = false,
 }: {
-  current: Locale;
+  /** left out on purpose in most places: the language is already known to the tree */
+  current?: Locale;
   className?: string;
   /** footer and top bar: native names only, no label */
   compact?: boolean;
 }) {
   const router = useRouter();
   const T = useT();
+  // le hook est appelé inconditionnellement ; la valeur passée ne fait que primer
+  const fromTree = useLocale();
+  const active = current ?? fromTree;
   const labelId = useId();
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState(false);
 
   function choose(locale: Locale) {
-    if (locale === current) return;
+    if (locale === active) return;
     setFailed(false);
     start(async () => {
       const response = await fetch('/api/locale', {
@@ -53,18 +57,18 @@ export function LocaleSwitcher({
       {!compact ? <span id={labelId} className="label text-graphite-500">{T('Language')}</span> : null}
       <ul className="flex flex-wrap items-center gap-x-2.5 gap-y-1" role="group" aria-labelledby={compact ? undefined : labelId}>
         {LOCALES.map((locale, index) => {
-          const active = locale === current;
+          const isSelected = locale === active;
           return (
             <li key={locale} className="flex items-center gap-2.5">
               {index > 0 ? <span aria-hidden className="h-3 w-px bg-ivory-200/10" /> : null}
               <button
                 type="button"
                 onClick={() => choose(locale)}
-                aria-pressed={active}
+                aria-pressed={isSelected}
                 disabled={pending}
                 className={cn(
                   'text-[11px] uppercase tracking-[0.16em] transition-colors duration-300 disabled:opacity-60',
-                  active ? 'text-gold-200 underline decoration-gold-400/40 underline-offset-4' : 'text-graphite-400 hover:text-ivory-100',
+                  isSelected ? 'text-gold-200 underline decoration-gold-400/40 underline-offset-4' : 'text-graphite-400 hover:text-ivory-100',
                 )}
               >
                 {LOCALE_META[locale].native}

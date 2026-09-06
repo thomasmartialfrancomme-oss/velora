@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 export type ToastTone = 'default' | 'success' | 'attention' | 'error';
 
@@ -35,6 +36,11 @@ export function useToast(): ToastApi {
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  // Confirmation and failure messages are produced far from here — in the action
+  // that called the API, sometimes by the API itself. Translating at the moment of
+  // display covers every one of them, including server text, and an unknown
+  // message still reads as the English that was written.
+  const T = useT();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [mounted, setMounted] = useState(false);
 
@@ -94,8 +100,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                         (!toast.tone || toast.tone === 'default') && 'bg-ivory-200/20',
                       )}
                     />
-                    <p className="text-[13px] leading-snug text-ivory-100">{toast.title}</p>
-                    {toast.description ? <p className="mt-1.5 text-[12.5px] leading-relaxed text-graphite-300">{toast.description}</p> : null}
+                    <p className="text-[13px] leading-snug text-ivory-100">{T(toast.title)}</p>
+                    {toast.description ? <p className="mt-1.5 text-[12.5px] leading-relaxed text-graphite-300">{T(toast.description)}</p> : null}
                     {toast.action ? (
                       <button
                         type="button"

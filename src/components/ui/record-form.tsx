@@ -10,6 +10,7 @@ import { FieldShell, SelectField, TextArea, TextField, ToggleField } from '@/com
 import { useToast } from '@/components/ui/toast';
 import { ApiClientError, apiRequest } from '@/lib/http/client';
 import { cn, label as humanise } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 /* ------------------------------------------------------------- the spec */
 
@@ -137,6 +138,7 @@ export function RecordForm({
   size?: 'sm' | 'md' | 'lg';
   method?: 'POST' | 'PATCH';
 }) {
+  const T = useT();
   const router = useRouter();
   const toast = useToast();
   const editing = Boolean(id);
@@ -240,9 +242,7 @@ export function RecordForm({
       <div className="space-y-6">
         {form}
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button type="button" variant="secondary" size="sm" onClick={() => setValues(seed)}>
-            Reset
-          </Button>
+          <Button type="button" variant="secondary" size="sm" onClick={() => setValues(seed)}>{T("Reset")}</Button>
           <Button type="button" size="sm" onClick={submit} loading={pending}>
             {submitLabel ?? (editing ? 'Save changes' : 'Create')}
           </Button>
@@ -272,9 +272,7 @@ export function RecordForm({
         loading={pending}
         footer={
           <>
-            <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={pending}>
-              Cancel
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={pending}>{T("Cancel")}</Button>
             <Button size="sm" onClick={submit} loading={pending}>
               {submitLabel ?? (editing ? 'Save changes' : 'Record it')}
             </Button>
@@ -288,6 +286,7 @@ export function RecordForm({
 }
 
 function FieldRenderer({ field, value, error, onChange }: { field: FieldSpec; value: unknown; error?: string; onChange: (value: unknown) => void }) {
+  const T = useT();
   const type = field.type ?? 'text';
   const spanClass = field.span === 2 || ['textarea', 'repeat', 'tags'].includes(type) ? 'sm:col-span-2' : 'sm:col-span-1';
 
@@ -437,6 +436,7 @@ export function DeleteButton({
   variant?: 'ghost' | 'danger' | 'secondary';
   size?: 'sm' | 'md';
 }) {
+  const T = useT();
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -504,6 +504,7 @@ export function QuickAction({
   onDone?: () => void;
   confirm?: { title: string; body: React.ReactNode; confirmLabel?: string };
 }) {
+  const T = useT();
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);

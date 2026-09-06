@@ -12,6 +12,7 @@ import { requireUser } from '@/lib/auth/session';
 import { listDocuments, listProperties } from '@/lib/data/read';
 import type { DocumentWithProperty } from '@/lib/data/read';
 import { DOCUMENT_CATEGORIES, STATUS_LABEL, daysUntil, formatDate, label as humanise, relativeTime } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Documents' };
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export const dynamic = 'force-dynamic';
 type Row = DocumentWithProperty;
 
 export default async function DocumentsPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const q = typeof searchParams?.q === 'string' ? searchParams.q : '';
   const category = typeof searchParams?.category === 'string' ? searchParams.category : 'all';
@@ -69,14 +71,14 @@ export default async function DocumentsPage({ searchParams }: { searchParams?: R
         />
       ),
     },
-    { key: 'residence', header: 'Residence', hideBelow: 'md', cell: (row) => (row.propertyName ? <Link href={`/properties/${row.propertyId}`} className="link-lux text-graphite-200 hover:text-ivory-50">{row.propertyName}</Link> : <span className="text-graphite-600">General</span>) },
+    { key: 'residence', header: 'Residence', hideBelow: 'md', cell: (row) => (row.propertyName ? <Link href={`/properties/${row.propertyId}`} className="link-lux text-graphite-200 hover:text-ivory-50">{row.propertyName}</Link> : <span className="text-graphite-600">{T("General")}</span>) },
     { key: 'owner', header: 'Held by', hideBelow: 'lg', cell: (row) => <span className="text-graphite-300">{row.owner ?? '—'}</span> },
     {
       key: 'expiry',
       header: 'Expires',
       cell: (row) => {
         const days = daysUntil(row.expiresAt);
-        if (row.expiresAt === null) return <span className="text-graphite-600">No expiry</span>;
+        if (row.expiresAt === null) return <span className="text-graphite-600">{T("No expiry")}</span>;
         return (
           <span className={days !== null && days < 0 ? 'text-state-risk' : days !== null && days <= 60 ? 'text-gold-200' : 'text-graphite-300'}>
             {formatDate(row.expiresAt, 'medium', user.timezone)}
@@ -102,7 +104,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams?: R
               <Download size={12} strokeWidth={1.4} /> File
             </a>
           ) : (
-            <span className="text-[10.5px] uppercase tracking-[0.18em] text-graphite-600">Record only</span>
+            <span className="text-[10.5px] uppercase tracking-[0.18em] text-graphite-600">{T("Record only")}</span>
           )}
           <RecordForm
             title="Edit record"
@@ -123,7 +125,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams?: R
               tags: row.tags,
               notes: row.notes,
             }}
-            trigger={<span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">Edit</span>}
+            trigger={<span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">{T("Edit")}</span>}
           />
           <DeleteButton
             path={`/api/documents/${row.id}`}
@@ -208,11 +210,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams?: R
       />
 
       <div className="rounded-[5px] border border-ivory-200/[0.07] bg-ink-950/60 px-6 py-5">
-        <p className="label mb-3 text-graphite-400">Where files actually are</p>
-        <p className="max-w-3xl text-[12.5px] leading-relaxed text-graphite-300">
-          An uploaded file is written to <code className="text-ivory-100">data/uploads/&lt;your member id&gt;/</code> on this machine and served back only
-          to you, as a download, with the original name. Nothing is passed to a third-party store, and no scan or OCR is performed — this build claims
-          neither. To move it to object storage, replace <code className="text-ivory-100">src/lib/files.ts</code>; the database only ever holds a
+        <p className="label mb-3 text-graphite-400">{T("Where files actually are")}</p>
+        <p className="max-w-3xl text-[12.5px] leading-relaxed text-graphite-300">{T("An uploaded file is written to")}<code className="text-ivory-100">data/uploads/&lt;your member id&gt;/</code>{T("on this machine and served back only to you, as a download, with the original name. Nothing is passed to a third-party store, and no scan or OCR is performed — this build claims neither. To move it to object storage, replace")}<code className="text-ivory-100">src/lib/files.ts</code>; the database only ever holds a
           relative path.
         </p>
       </div>

@@ -2,6 +2,7 @@
 
 import { forwardRef, useId } from 'react';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 const CONTROL =
   'w-full rounded-[3px] border border-ivory-200/12 bg-ink-950/70 px-3.5 py-2.5 text-[14px] text-ivory-100 ' +
@@ -27,12 +28,16 @@ export function FieldShell({
   children: React.ReactNode;
   counter?: string;
 }) {
+  // FieldShell is the single frame around every control in the product, so the
+  // words that belong to a field are translated here rather than at the forty
+  // call sites that supply them.
+  const T = useT();
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {label ? (
         <div className="flex items-baseline justify-between gap-3">
           <label htmlFor={htmlFor} className="text-[10.5px] uppercase tracking-[0.22em] text-graphite-300">
-            {label}
+            {label ? T(label) : null}
             {required ? <span className="ml-1 text-gold-400">*</span> : null}
           </label>
           {counter ? <span className="text-[10.5px] tabular-nums text-graphite-500">{counter}</span> : null}
@@ -42,10 +47,10 @@ export function FieldShell({
       {error ? (
         <p className="flex items-start gap-1.5 text-[12px] leading-snug text-state-risk">
           <span aria-hidden className="mt-[6px] h-[3px] w-[3px] shrink-0 rounded-full bg-state-risk" />
-          {error}
+          {T(error)}
         </p>
       ) : hint ? (
-        <p className="text-[12px] leading-snug text-graphite-400">{hint}</p>
+        <p className="text-[12px] leading-snug text-graphite-400">{T(hint)}</p>
       ) : null}
     </div>
   );

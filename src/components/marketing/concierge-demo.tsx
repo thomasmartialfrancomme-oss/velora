@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useInView, useReducedMotion } from 'framer-motion';
 import { Section } from '@/components/marketing/section';
 import { cn } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 interface Exchange {
   command: string;
@@ -74,6 +75,7 @@ const EXCHANGES: Exchange[] = [
 ];
 
 function TypingLine({ text, play, onDone }: { text: string; play: boolean; onDone: () => void }) {
+  const T = useT();
   const reduce = useReducedMotion();
   const [shown, setShown] = useState(reduce ? text : '');
 
@@ -109,6 +111,7 @@ function TypingLine({ text, play, onDone }: { text: string; play: boolean; onDon
 }
 
 export function ConciergeDemo() {
+  const T = useT();
   const [active, setActive] = useState(0);
   const [typed, setTyped] = useState(false);
   const [started, setStarted] = useState(false);
@@ -152,7 +155,7 @@ export function ConciergeDemo() {
     >
       <div ref={ref} className="grid gap-8 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,2fr)] lg:gap-12">
         <div>
-          <p className="label mb-5 text-ink-900/45">Try a command</p>
+          <p className="label mb-5 text-ink-900/45">{T("Try a command")}</p>
           <ul className="space-y-2">
             {EXCHANGES.map((item, index) => (
               <li key={item.command}>
@@ -175,9 +178,7 @@ export function ConciergeDemo() {
               </li>
             ))}
           </ul>
-          <p className="mt-6 max-w-xs text-[12px] leading-relaxed text-ink-900/50">
-            A demonstration of the interface. In the product, the same request writes real tasks against your residences.
-          </p>
+          <p className="mt-6 max-w-xs text-[12px] leading-relaxed text-ink-900/50">{T("A demonstration of the interface. In the product, the same request writes real tasks against your residences.")}</p>
         </div>
 
         <div className="relative overflow-hidden rounded-[6px] border border-ink-900/12 bg-ivory-50 shadow-[0_30px_80px_-60px_rgba(13,15,19,0.55)]">
@@ -188,14 +189,14 @@ export function ConciergeDemo() {
                 <span className="absolute inset-0 rounded-full bg-ink-950/70" />
                 <span className="absolute inset-0 animate-pulse-soft rounded-full bg-ink-950/40" />
               </span>
-              <span className="text-[10.5px] uppercase tracking-[0.3em] text-ink-900/70">Velora AI</span>
+              <span className="text-[10.5px] uppercase tracking-[0.3em] text-ink-900/70">{T("Velora AI")}</span>
             </span>
-            <span className="text-[10.5px] uppercase tracking-[0.2em] text-ink-900/40">Private session · encrypted at rest</span>
+            <span className="text-[10.5px] uppercase tracking-[0.2em] text-ink-900/40">{T("Private session · encrypted at rest")}</span>
           </header>
 
           <div className="px-6 py-7 sm:px-8">
             <div className="flex items-baseline gap-4">
-              <span className="label shrink-0 text-ink-900/40">You</span>
+              <span className="label shrink-0 text-ink-900/40">{T("You")}</span>
               <p className="font-serif text-[1.28rem] leading-snug text-ink-950">
                 {started ? <TypingLine text={exchange.command} play={!typed} onDone={() => setTyped(true)} /> : <span className="text-ink-900/30">…</span>}
               </p>
@@ -212,7 +213,7 @@ export function ConciergeDemo() {
                   className="mt-8 border-t border-ink-900/10 pt-7"
                 >
                   <div className="flex items-baseline gap-4">
-                    <span className="label shrink-0 text-ink-900/40">Velora</span>
+                    <span className="label shrink-0 text-ink-900/40">{T("Velora")}</span>
                     <p className="font-serif text-[1.2rem] leading-snug text-ink-950">{exchange.headline}</p>
                   </div>
 
@@ -253,7 +254,7 @@ export function ConciergeDemo() {
                       />
                     ))}
                   </span>
-                  <span className="text-[11.5px] uppercase tracking-[0.2em]">Reading your records</span>
+                  <span className="text-[11.5px] uppercase tracking-[0.2em]">{T("Reading your records")}</span>
                 </motion.div>
               )}
             </AnimatePresence>

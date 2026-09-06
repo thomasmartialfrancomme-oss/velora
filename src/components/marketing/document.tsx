@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Reveal } from '@/components/ui/reveal';
+import { getT, localeMeta } from '@/lib/i18n/server';
 import { Section } from '@/components/marketing/section';
 
 export type DocumentBlock =
@@ -29,17 +30,27 @@ export function DocumentPage({
   sections: DocumentSection[];
   aside?: { title: string; items: { label: string; href?: string; note?: string; state?: 'live' | 'partial' | 'planned' }[] };
 }) {
+  const T = getT();
+  const { locale } = localeMeta();
   return (
     <>
       <header className="relative border-b border-ivory-200/[0.07] bg-ink-1000 pb-16 pt-16 sm:pb-20 sm:pt-20">
         <div className="container">
           <Reveal>
-            <p className="label mb-6 text-gold-300/80">{eyebrow}</p>
+            <p className="label mb-6 text-gold-300/80">{T(eyebrow)}</p>
             <h1 className="max-w-3xl font-serif text-[clamp(2.3rem,5vw,3.8rem)] font-light uppercase leading-[1.06] tracking-[0.03em] text-ivory-50">
-              {title}
+              {T(title)}
             </h1>
-            <p className="mt-8 max-w-2xl text-[15px] leading-[1.75] text-graphite-300">{lede}</p>
+            <p className="mt-8 max-w-2xl text-[15px] leading-[1.75] text-graphite-300">{T(lede)}</p>
             {updated ? <p className="label mt-8 text-graphite-600">{updated}</p> : null}
+            {locale === 'en' ? null : (
+              /* A translated legal page is a courtesy. Saying so, on the page, is
+                 the honest part: the governing text stays the English one until a
+                 reviewed translation of it exists. */
+              <p className="mt-6 max-w-2xl border-l border-gold-400/40 pl-4 text-[12.5px] leading-relaxed text-graphite-500">
+                {T('This page is offered in your language as a courtesy. Where the two versions differ, the English text is the one that governs.')}
+              </p>
+            )}
           </Reveal>
         </div>
       </header>
@@ -53,7 +64,7 @@ export function DocumentPage({
                   <span className="font-sans text-[10.5px] tracking-[0.2em] text-graphite-600">
                     {String(index + 1).padStart(2, '0')}
                   </span>
-                  {section.heading}
+                  {T(section.heading)}
                 </h2>
                 <div className="mt-5 space-y-5">
                   {section.blocks.map((block, blockIndex) => {
@@ -63,7 +74,7 @@ export function DocumentPage({
                           {block.items.map((item) => (
                             <li key={item} className="flex gap-3.5 text-[14px] leading-[1.8] text-graphite-300">
                               <span className="mt-[9px] h-[3px] w-[3px] shrink-0 rounded-full bg-gold-400/70" />
-                              <span>{item}</span>
+                              <span>{T(item)}</span>
                             </li>
                           ))}
                         </ul>
@@ -75,13 +86,13 @@ export function DocumentPage({
                           key={blockIndex}
                           className="rounded-[4px] border-l border-gold-400/45 bg-ink-900/60 py-4 pl-5 pr-5 text-[13px] leading-relaxed text-graphite-200"
                         >
-                          {block.text}
+                          {T(block.text)}
                         </p>
                       );
                     }
                     return (
                       <p key={blockIndex} className="text-[14px] leading-[1.85] text-graphite-300">
-                        {block.text}
+                        {T(block.text)}
                       </p>
                     );
                   })}
@@ -93,7 +104,7 @@ export function DocumentPage({
           <aside className="lg:sticky lg:top-28 lg:self-start">
             {aside ? (
               <div className="rounded-[6px] border border-ivory-200/[0.08] bg-ink-950/80 p-7">
-                <p className="label mb-6 text-graphite-400">{aside.title}</p>
+                <p className="label mb-6 text-graphite-400">{T(aside.title)}</p>
                 <ul className="space-y-4">
                   {aside.items.map((item) => (
                     <li key={item.label} className="flex items-start gap-3">

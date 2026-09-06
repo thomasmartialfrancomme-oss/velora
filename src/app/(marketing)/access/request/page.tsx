@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AccessRequestForm, RequestStatusLookup } from '@/components/marketing/access-request-form';
 import { Reveal } from '@/components/ui/reveal';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = {
   title: 'Request private access',
@@ -23,24 +24,20 @@ const OFFERS = [
 ];
 
 export default function AccessRequestPage() {
+  const T = getT();
   return (
     <>
       <header className="relative border-b border-ivory-200/[0.07] bg-ink-1000 pb-16 pt-16 sm:pb-20 sm:pt-24">
         <div className="container">
           <div className="grid items-end gap-12 lg:grid-cols-[1.1fr_0.9fr]">
             <Reveal>
-              <p className="label mb-6 text-gold-300/80">Membership</p>
-              <h1 className="font-serif text-[clamp(2.5rem,5.6vw,4.4rem)] font-light uppercase leading-[1.04] tracking-[0.03em] text-ivory-50">
-                Request
-                <br />
+              <p className="label mb-6 text-gold-300/80">{T("Membership")}</p>
+              <h1 className="font-serif text-[clamp(2.5rem,5.6vw,4.4rem)] font-light uppercase leading-[1.04] tracking-[0.03em] text-ivory-50">{T("Request")}<br />
                 private access
               </h1>
             </Reveal>
             <Reveal delay={0.12}>
-              <p className="max-w-md text-[14.5px] leading-[1.8] text-graphite-300">
-                We take a limited number of households each quarter, so that every office is properly staffed before it opens. This enquiry is read by
-                the private office — not routed through a sales desk — and answered within two working days.
-              </p>
+              <p className="max-w-md text-[14.5px] leading-[1.8] text-graphite-300">{T("We take a limited number of households each quarter, so that every office is properly staffed before it opens. This enquiry is read by the private office — not routed through a sales desk — and answered within two working days.")}</p>
             </Reveal>
           </div>
         </div>
@@ -51,7 +48,7 @@ export default function AccessRequestPage() {
           <div className="grid gap-14 lg:grid-cols-[0.85fr_1.15fr]">
             <div className="space-y-14">
               <Reveal>
-                <h2 className="label mb-7 text-graphite-400">What we ask</h2>
+                <h2 className="label mb-7 text-graphite-400">{T("What we ask")}</h2>
                 <ul className="space-y-6">
                   {ASKS.map(([title, body]) => (
                     <li key={title} className="border-l border-ivory-200/[0.1] pl-5">
@@ -63,7 +60,7 @@ export default function AccessRequestPage() {
               </Reveal>
 
               <Reveal delay={0.08}>
-                <h2 className="label mb-7 text-graphite-400">What follows</h2>
+                <h2 className="label mb-7 text-graphite-400">{T("What follows")}</h2>
                 <ul className="space-y-6">
                   {OFFERS.map(([title, body]) => (
                     <li key={title} className="border-l border-gold-400/40 pl-5">
@@ -76,11 +73,8 @@ export default function AccessRequestPage() {
 
               <Reveal delay={0.14}>
                 <div className="rounded-[6px] border border-ivory-200/[0.08] bg-ink-950/70 p-7">
-                  <p className="label mb-4 text-graphite-400">On discretion</p>
-                  <p className="text-[12.5px] leading-relaxed text-graphite-300">
-                    Nothing you write here is shared with a third party, used to advertise, or kept longer than eighteen months after a request closes.
-                    Requests are stored in the same register as member data, under the same access rules.
-                  </p>
+                  <p className="label mb-4 text-graphite-400">{T("On discretion")}</p>
+                  <p className="text-[12.5px] leading-relaxed text-graphite-300">{T("Nothing you write here is shared with a third party, used to advertise, or kept longer than eighteen months after a request closes. Requests are stored in the same register as member data, under the same access rules.")}</p>
                 </div>
               </Reveal>
             </div>

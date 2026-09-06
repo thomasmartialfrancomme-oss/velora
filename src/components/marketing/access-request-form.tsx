@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { SelectField, TextArea, TextField } from '@/components/ui/field';
 import { apiRequest } from '@/lib/http/client';
 import { COUNTRIES, PRIMARY_REQUIREMENTS } from '@/lib/utils/format';
+import { useT } from '@/lib/i18n/context';
 
 type Submitted = { message: string; duplicate?: boolean };
 
 export function AccessRequestForm() {
+  const T = useT();
   const [values, setValues] = useState({
     firstName: '',
     lastName: '',
@@ -80,12 +82,8 @@ export function AccessRequestForm() {
             ))}
           </ol>
           <div className="mt-9 flex flex-wrap items-center gap-6">
-            <Button asLink href="/login" variant="gold-outline" size="md" trailingIcon={<ArrowRight size={14} strokeWidth={1.4} />}>
-              Open an evaluation account
-            </Button>
-            <Link href="/" className="text-[11px] uppercase tracking-[0.2em] text-graphite-400 transition-colors hover:text-ivory-100">
-              Back to the introduction
-            </Link>
+            <Button asLink href="/login" variant="gold-outline" size="md" trailingIcon={<ArrowRight size={14} strokeWidth={1.4} />}>{T("Open an evaluation account")}</Button>
+            <Link href="/" className="text-[11px] uppercase tracking-[0.2em] text-graphite-400 transition-colors hover:text-ivory-100">{T("Back to the introduction")}</Link>
           </div>
         </div>
       </motion.div>
@@ -94,7 +92,7 @@ export function AccessRequestForm() {
 
   return (
     <form onSubmit={submit} className="relative rounded-[6px] border border-ivory-200/[0.1] bg-ink-950 p-7 sm:p-9" noValidate>
-      <p className="label mb-8 text-graphite-400">Private access request</p>
+      <p className="label mb-8 text-graphite-400">{T("Private access request")}</p>
 
       <div className="space-y-6">
         <div className="grid gap-6 sm:grid-cols-2">
@@ -171,9 +169,7 @@ export function AccessRequestForm() {
 
         {/* Honeypot: invisible to people, irresistible to bots. */}
         <div aria-hidden className="absolute h-0 w-0 overflow-hidden opacity-0">
-          <label>
-            Leave this field empty
-            <input tabIndex={-1} autoComplete="off" name="website" value={values.website} onChange={(e) => setValues({ ...values, website: e.target.value })} />
+          <label>{T("Leave this field empty")}<input tabIndex={-1} autoComplete="off" name="website" value={values.website} onChange={(e) => setValues({ ...values, website: e.target.value })} />
           </label>
         </div>
 
@@ -184,12 +180,8 @@ export function AccessRequestForm() {
         ) : null}
 
         <div className="pt-1">
-          <Button type="submit" size="lg" className="w-full" loading={pending} trailingIcon={<ArrowRight size={14} strokeWidth={1.4} />}>
-            Request Private Access
-          </Button>
-          <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">
-            No card details are requested at this stage. Your enquiry is read by the private office, not a queue manager.
-          </p>
+          <Button type="submit" size="lg" className="w-full" loading={pending} trailingIcon={<ArrowRight size={14} strokeWidth={1.4} />}>{T("Request Private Access")}</Button>
+          <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">{T("No card details are requested at this stage. Your enquiry is read by the private office, not a queue manager.")}</p>
         </div>
       </div>
     </form>
@@ -198,6 +190,7 @@ export function AccessRequestForm() {
 
 /** Look up the state of a request already made — a real, working check. */
 export function RequestStatusLookup() {
+  const T = useT();
   const [email, setEmail] = useState('');
   const [result, setResult] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -230,14 +223,12 @@ export function RequestStatusLookup() {
 
   return (
     <form onSubmit={lookup} className="rounded-[6px] border border-ivory-200/[0.08] bg-ink-900/50 p-6">
-      <p className="label mb-4 text-graphite-400">Already asked?</p>
+      <p className="label mb-4 text-graphite-400">{T("Already asked?")}</p>
       <div className="flex items-end gap-3">
         <div className="flex-1">
           <TextField label="Check your request" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@household.com" />
         </div>
-        <Button type="submit" variant="secondary" loading={pending} icon={<Search size={13} strokeWidth={1.4} />}>
-          Look up
-        </Button>
+        <Button type="submit" variant="secondary" loading={pending} icon={<Search size={13} strokeWidth={1.4} />}>{T("Look up")}</Button>
       </div>
       {result ? <p className="mt-4 text-[12.5px] leading-relaxed text-graphite-300">{result}</p> : null}
     </form>

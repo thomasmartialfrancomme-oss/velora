@@ -13,6 +13,7 @@ import { requireUser } from '@/lib/auth/session';
 import { listProperties, listTrips } from '@/lib/data/read';
 import type { TripWithDetail } from '@/lib/data/read';
 import { TRAVEL_MODES, TRIP_STATUS, STATUS_LABEL, formatDate, formatTime, label as humanise, relativeTime } from '@/lib/utils/format';
+import { getT } from '@/lib/i18n/server';
 
 export const metadata: Metadata = { title: 'Travel' };
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ const LEG_KINDS = ['transfer', 'flight', 'train', 'arrival', 'house', 'dinner', 
 const LEG_STATUSES = ['pending', 'requested', 'confirmed', 'cancelled'];
 
 export default async function TravelPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+  const T = getT();
   const user = await requireUser();
   const scopeRaw = typeof searchParams?.scope === 'string' ? searchParams.scope : 'upcoming';
   const scope = (['upcoming', 'past', 'all'].includes(scopeRaw) ? scopeRaw : 'upcoming') as 'upcoming' | 'past' | 'all';
@@ -116,7 +118,7 @@ export default async function TravelPage({ searchParams }: { searchParams?: Reco
             {row.legCount - row.pendingLegs}/{row.legCount} confirmed
           </span>
         ) : (
-          <span className="text-graphite-600">No plan yet</span>
+          <span className="text-graphite-600">{T("No plan yet")}</span>
         ),
     },
     { key: 'party', header: 'Party', align: 'right', hideBelow: 'lg', cell: (row) => <span className="text-graphite-300">{row.travelers}</span> },
@@ -127,9 +129,7 @@ export default async function TravelPage({ searchParams }: { searchParams?: Reco
       width: '11rem',
       cell: (row) => (
         <span className="relative z-10 inline-flex items-center justify-end gap-2">
-          <Link href={`/travel/${row.id}`} className="text-[10.5px] uppercase tracking-[0.18em] text-gold-200 transition-colors hover:text-gold-100">
-            Plan →
-          </Link>
+          <Link href={`/travel/${row.id}`} className="text-[10.5px] uppercase tracking-[0.18em] text-gold-200 transition-colors hover:text-gold-100">{T("Plan →")}</Link>
           <RecordForm
             title={`Edit ${row.title}`}
             eyebrow="Journey"
@@ -150,7 +150,7 @@ export default async function TravelPage({ searchParams }: { searchParams?: Reco
               legs: row.legs.map((leg) => ({ label: leg.label, kind: leg.kind, at: leg.at, provider: leg.provider, detail: leg.detail, status: leg.status })),
             }}
             size="lg"
-            trigger={<span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">Edit</span>}
+            trigger={<span className="cursor-pointer px-1 text-[10.5px] uppercase tracking-[0.18em] text-graphite-400 transition-colors hover:text-gold-200">{T("Edit")}</span>}
           />
           <DeleteButton path={`/api/trips/${row.id}`} label="Remove" title={`Remove “${row.title}”?`} body="The journey and its arrival steps are deleted. Anything already booked with a counterparty is not affected — cancel those directly." />
         </span>
@@ -173,9 +173,7 @@ export default async function TravelPage({ searchParams }: { searchParams?: Reco
         }
         actions={
           <>
-            <Button asLink href="/lifestyle" variant="ghost" size="md">
-              Reservations
-            </Button>
+            <Button asLink href="/lifestyle" variant="ghost" size="md">{T("Reservations")}</Button>
             <RecordForm
               title="Raise a journey"
               eyebrow="Travel"
