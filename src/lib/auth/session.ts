@@ -108,7 +108,7 @@ export async function loadUserByClaims(claims: SessionClaims): Promise<SessionUs
   if (row.status === 'suspended') return null;
   // Revocation: tokens issued before a password change / "sign out everywhere" are dead.
   const revokedAt = row.sessions_revoked_at ? Date.parse(row.sessions_revoked_at) : 0;
-  if (revokedAt && claims.iat && claims.iat * 1000 <= revokedAt) return null;
+  if (revokedAt && claims.iat && claims.iat * 1000 < revokedAt) return null;
 
   return {
     id: row.id as string,
@@ -177,10 +177,21 @@ export async function requireApiAdmin(): Promise<SessionUser> {
 
 /* ------------------------------------------------------------- helpers */
 
+/**
+ * A revocation is recorded at the start of the next second: token `iat` is
+ * second-granular, so stamping `now` would also invalidate a session minted in
+ * the same second as a password change — which is exactly what a member does when
+ * they sign in again right after changing it. Rounding up keeps every token from
+ * the revocation's own second dead, and lets the next one live.
+ */
+export function revocationStamp(): string {
+  return new Date(Math.ceil(Date.now() / 1000) * 1000).toISOString();
+}
+
 export async function revokeAllSessions(userId: string, reason: string): Promise<void> {
   const db = getDb();
   db.run('UPDATE users SET sessions_revoked_at = @now, updated_at = @now WHERE id = @id', {
-    now: nowIso(),
+    now: revocationStamp(),
     id: userId,
   });
   audit({ userId, event: 'session.revoked_all', meta: { reason } });
@@ -191,7 +202,7 @@ export async function setPassword(userId: string, plain: string): Promise<void> 
   const db = getDb();
   db.run('UPDATE users SET password_hash = @hash, sessions_revoked_at = @now, updated_at = @now WHERE id = @id', {
     hash,
-    now: nowIso(),
+    now: revocationStamp(),
     id: userId,
   });
   audit({ userId, event: 'account.password_changed', meta: { sessions_revoked: true } });
