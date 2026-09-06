@@ -123,6 +123,17 @@ const mock = http.createServer((request, response) => {
       return reply(response, 200, { id: `cus_check_${MOCK.customerSeq}`, object: 'customer', email: params.email });
     }
     if (request.method === 'POST' && url.pathname === '/v1/checkout/sessions') {
+      // Règles que Stripe applique et que le harnais ignorait : `invoice_creation` est réservé à
+      // `mode: payment`, et un `price` inconnu est une erreur — pas un détail à tolérer.
+      const bad = (param, message) => reply(response, 400, { error: { type: 'invalid_request_error', param, message } });
+      if (params.mode === 'subscription' && params.invoice_creation !== undefined) {
+        return bad('invoice_creation', 'You can only enable invoice creation when `mode` is set to `payment`. Invoices are created automatically when `mode` is set to `subscription`.');
+      }
+      if (params.mode === 'payment' && params.subscription_data !== undefined) return bad('subscription_data', 'You cannot use `subscription_data` with `mode: payment`.');
+      const priceId = params.line_items?.[0]?.price;
+      if (priceId && ![...MOCK.prices.values(), ...MOCK.extraPrices].some((row) => row.id === priceId)) {
+        return bad('line_items[0][price]', `No such price: '${priceId}'`);
+      }
       MOCK.sessionSeq += 1;
       return reply(response, 200, {
         id: `cs_check_${MOCK.sessionSeq}`,
@@ -615,6 +626,16 @@ try {
   const priceIds = [...MOCK.prices.values()].map((row) => row.id);
   check('les prix relus sont les nôtres, pas un prix voisin du compte', priceIds.length === 6 && priceIds.every((id) => id.startsWith('price_check_')), JSON.stringify(priceIds));
   const webhookCall = [...REQUESTS].reverse().find((entry) => entry.path === '/v1/webhook_endpoints' && entry.method === 'POST');
+  const checkoutCalls = REQUESTS.filter((entry) => entry.path === '/v1/checkout/sessions' && entry.method === 'POST');
+  check('la session d abonnement ne demande pas de facture a la main', checkoutCalls.every((entry) => entry.params?.mode === 'subscription' && entry.params?.invoice_creation === undefined), JSON.stringify(checkoutCalls.map((e) => Object.keys(e.params ?? {})).slice(0, 1)));
+  // Soit l'identifiant du catalogue Stripe (après le script de préparation), soit le montant
+  // porté en ligne (avant que quiconque touche un tableau de bord) — mais dans les deux cas le
+  // montant facturé est celui du catalogue du code, jamais un nombre inventé pour l'occasion.
+  check('la session facture le montant du catalogue', checkoutCalls.every((entry) => {
+    const item = entry.params?.line_items?.[0] ?? {};
+    const enLigne = item.price_data?.unit_amount !== undefined && [19_900, 214_920, 49_900, 526_944, 150_000, 1_800_000].includes(Number(item.price_data.unit_amount));
+    return String(item.price ?? '').startsWith('price_') || enLigne;
+  }), JSON.stringify(checkoutCalls.map((e) => e.params?.line_items?.[0]?.price ?? e.params?.line_items?.[0]?.price_data?.unit_amount).slice(0, 3)));
   check('le webhook est créé sur la bonne URL avec sept événements', String(webhookCall?.params?.url) === `${BASE2}/api/billing/webhook` && (webhookCall?.params?.enabled_events ?? []).length === 7, JSON.stringify(webhookCall?.params?.enabled_events));
   check('chaque écriture porte une clé d’idempotence', [...REQUESTS].filter((entry) => entry.method === 'POST' && /^\/v1\/(prices|products|webhook_endpoints|billing_portal\/configurations)$/.test(entry.path)).every((entry) => entry.headers['idempotency-key']), 'écritures sans en-tête Idempotency-Key');
   check('le portail client est créé', Boolean(outcome?.portalCreated), JSON.stringify(outcome?.portalConfigurationId ?? outcome?.portalCreated));

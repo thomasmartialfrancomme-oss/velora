@@ -323,7 +323,9 @@ class StripeBilling implements BillingProvider {
           metadata: { plan: ctx.plan.key, cycle: ctx.billingCycle, userId: ctx.actor.id },
         },
         metadata: { plan: ctx.plan.key, cycle: ctx.billingCycle, userId: ctx.actor.id },
-        invoice_creation: { enabled: true },
+        // Pas d'`invoice_creation` ici : ce champ n'existe que pour `mode: 'payment'`. Sur un
+        // abonnement Stripe crée la facture de lui-même, et envoyer la clé fait refuser la session —
+        // mesuré sur le compte réel, où le bouton « Adhérer » répondait 500.
         allow_promotion_codes: false,
         success_url: `${ctx.appUrl}/membership?status=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${ctx.appUrl}/membership?status=cancelled`,

@@ -129,7 +129,15 @@ Si un membre annule, la coupure est demandée chez Stripe (`DELETE /v1/subscript
 `invoice_now`) puis reflétée localement ; l'état local n'est jamais la source de vérité du
 contrat, c'est le miroir — et le webhook est la seule chose qui puisse l'écrire.
 
-## 5. Ce que `npm run check:stripe` prouve, sans compte Stripe (59 contrôles)
+## 5. Ce que `npm run check:stripe` prouve, sans compte Stripe (71 contrôles)
+Quatre regles de Stripe sont verifiees par le harnais parce qu'elles ont ete mesurees sur le
+compte reel, pas devinees : `GET /v1/prices?lookup_keys[0]=` (il n'existe pas de route
+`/v1/prices/lookup`), les vrais noms de capacites (`card_payments`, `sepa_debit_payments`, …) lus
+sur `GET /v1/account/capabilities` et non sur l'objet compte, le profil du portail limite aux champs
+documentes (`default_return_url`, `business_profile{headline, privacy_policy_url,
+terms_of_service_url}`, `features` — pas de `subscription_update` sans produits), et l'interdiction
+d'envoyer `invoice_creation` sur une session Checkout en mode `subscription`. Le mock refuse
+desormais ce que Stripe refuse : une suite verte a de nouveau une signification.
 
 Un serveur local parle le protocole de Stripe (mêmes corps de requête, mêmes en-têtes), une
 deuxième instance de l'application démarre dessus avec des clés de test, et 35 contrôles exécutent
