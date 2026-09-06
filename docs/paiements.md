@@ -49,7 +49,35 @@ lui-même quand le membre passe au mensuel.
 6. **Un nom de rail mal orthographié dans la configuration est signalé**, pas ignoré
    (`unknownMethods` dans l'état de facturation, visible à la console).
 
-## 3. Brancher votre compte Stripe — quatre étapes, aucune donnée de carte chez vous
+## 3. Brancher votre compte Stripe — deux chemins, un seul à choisir
+
+### 3 bis. Le plus court : coller votre clé dans la console (`/admin` → Facturation)
+
+Vous avez déjà un compte Stripe ? Un champ suffit. Le produit :
+
+1. vérifie la clé contre `GET /v1/account` (un mauvais jeton échoue là, avant toute écriture) ;
+2. lit **ce que votre compte a le droit d'encaisser** (`capabilities`) et n'active que ces rails —
+   si le virement n'est pas approuvé chez Stripe, il n'est pas proposé au membre, et la console
+   vous dit lequel manque, avec le lien ;
+3. crée (ou retrouve) les trois produits et les six prix du catalogue, la configuration du portail
+   client, et l'endpoint webhook — un endpoint **nouvellement créé** renvoie son secret de signature,
+   ce qui est la seule raison pour laquelle le câblage tient en un champ ;
+4. stocke les deux clés **chiffrées** (AES-256-GCM, clé dérivée de `AUTH_SECRET`) dans la table
+   `settings`, et affiche `sk_live_…4242` — jamais la clé complète, nulle part.
+
+Reconnecter le même compte ne duplique rien : les prix sont retrouvés par `lookup_key`, le portail
+existant est réutilisé, et aucun second endpoint n'est ajouté tant qu'un secret est déjà connu.
+`Déconnecter` efface les lignes locales **et** supprime l'endpoint chez Stripe.
+
+Trois limites de ce chemin, dites à l'écran plutôt que cachées :
+
+- **`AUTH_SECRET` est le coffre.** Le changer rend la connexion illisible : il faudra recoller la clé.
+- **Un disque éphémère (l'offre gratuite Render) ne garde ni la base, ni donc la connexion** après un
+  redéploiement : il faudra la recoller, ou préférer le chemin 3 ter, qui survit aux déploiements.
+- **Ne diffusez pas votre base** : le fichier `data/velora.db` contient la connexion chiffrée ;
+  un zip de sauvegarde n'est pas un artefact à publier.
+
+### 3 ter. Le chemin environnement (recommandé dès que vous avez un disque persistant)
 
 ```bash
 # 1. Créer le compte et activer les rails (ça, aucune API ne le fait : ce sont des
@@ -91,7 +119,7 @@ Si un membre annule, la coupure est demandée chez Stripe (`DELETE /v1/subscript
 `invoice_now`) puis reflétée localement ; l'état local n'est jamais la source de vérité du
 contrat, c'est le miroir — et le webhook est la seule chose qui puisse l'écrire.
 
-## 5. Ce que `npm run check:stripe` prouve, sans compte Stripe
+## 5. Ce que `npm run check:stripe` prouve, sans compte Stripe (59 contrôles)
 
 Un serveur local parle le protocole de Stripe (mêmes corps de requête, mêmes en-têtes), une
 deuxième instance de l'application démarre dessus avec des clés de test, et 35 contrôles exécutent

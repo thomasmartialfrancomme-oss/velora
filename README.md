@@ -71,7 +71,7 @@ npm run typecheck   # tsc --noEmit, strict mode — clean
 npm run lint        # next lint with eslint-config-next — no errors
 npm run build       # production build — 28 pages, 47 API routes, middleware
 npm run db:verify   # schema, integrity, foreign keys, bcrypt digests, tenant columns, isolation
-npm run check:stripe  # 35 checks on the money path against a local Stripe stand-in
+npm run check:stripe  # 59 checks on the money path (checkout, transfer, webhook trust, admin-side Stripe connection) against a local Stripe stand-in
 npm run smoke       # 48 checks over HTTP: every page, key reads, upload→download→delete, privacy, guards
 ```
 

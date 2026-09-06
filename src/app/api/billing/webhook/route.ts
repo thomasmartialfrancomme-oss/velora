@@ -19,8 +19,8 @@
  * no token. The only fields read are identifiers, amounts and dates.
  */
 import { NextResponse } from 'next/server';
-import { env } from '@/lib/config';
 import { getDb, newId, nowIso } from '@/lib/db';
+import { billingRuntime } from '@/lib/billing/runtime';
 import { verifyStripeSignature } from '@/lib/billing/stripe-api';
 
 export const dynamic = 'force-dynamic';
@@ -44,14 +44,18 @@ interface StripeObject extends Record<string, unknown> {
 const asId = (value: unknown): string | null => (typeof value === 'string' ? value : null);
 
 export async function POST(request: Request) {
-  if (!env.billing.stripeWebhookSecret) {
+  // The runtime, not `env`: a secret learned from a connection made in /admin lives in
+  // the database, and an endpoint that only looks at the environment answers 400 to every
+  // delivery — which reads to a paying customer as « j'ai payé et rien ne s'est ouvert ».
+  const runtime = billingRuntime();
+  if (!runtime.webhookSecret) {
     return NextResponse.json(
       {
         ok: false,
         error: {
           code: 'webhook_unconfigured',
           message:
-            'No Stripe signing secret is configured, so this endpoint accepts nothing. Set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET, then point the webhook at /api/billing/webhook.',
+            'No Stripe signing secret is configured, so this endpoint accepts nothing. Set STRIPE_WEBHOOK_SECRET (or connect the account from /admin → Facturation, which stores it), then point the webhook at /api/billing/webhook.',
         },
       },
       { status: 400 },

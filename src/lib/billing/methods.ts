@@ -17,7 +17,7 @@
  *    the annual plan, as an invoice with a due date — one payment a year, the way
  *    a household's accounts department actually prefers to pay.
  */
-import { env } from '@/lib/config';
+import { billingRuntime } from '@/lib/billing/runtime';
 
 export type MethodId = 'card' | 'sepa_debit' | 'us_bank_account' | 'bacs_debit' | 'ideal' | 'bancontact' | 'blik' | 'swish' | 'bank_transfer';
 
@@ -70,7 +70,10 @@ export const METHODS: Record<MethodId, MethodSpec> = {
     recurring: false,
     kind: 'transfer',
     stripeType: 'bank_transfer',
-    caveat: `Paid against an invoice with a ${env.billing.transferDueDays}-day due date. Renewal is a new invoice, not an automatic charge.`,
+    // No number here on purpose: the due date is operator-set, and this catalogue is
+    // built at import time, where reading a configuration that needs the database
+    // would be a round trip in the wrong place. The screen shows the real figure.
+    caveat: 'Paid against an invoice with a due date. Renewal is a new invoice, never an automatic charge.',
   },
 };
 
@@ -84,8 +87,8 @@ export interface MethodPolicy {
   oneOff: MethodSpec[];
 }
 
-export function methodPolicy(): MethodPolicy {
-  const requested = (env.billing.paymentMethods || 'card')
+export function methodPolicy(list?: string): MethodPolicy {
+  const requested = (list ?? (billingRuntime().paymentMethods || 'card'))
     .split(',')
     .map((raw) => raw.trim().toLowerCase())
     .filter(Boolean);

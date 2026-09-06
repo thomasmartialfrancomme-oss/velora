@@ -7,6 +7,8 @@ import { ConsoleLink } from '@/components/app/admin-actions';
 import { requireAdmin } from '@/lib/auth/session';
 import { adminAccessRequests, adminActivity, adminAiRequests, adminProperties, adminSettings, adminStats, adminSubscriptions, listTickets } from '@/lib/data/admin';
 import { getBillingStatus } from '@/lib/billing';
+import { connectionSummary } from '@/lib/billing/runtime';
+import { BillingConnection } from '@/components/app/billing-connection';
 import { activeProviderInfo } from '@/lib/ai/service';
 import { formatDate, formatMoney, label as humanise, relativeTime, STATUS_LABEL } from '@/lib/utils/format';
 import { getT } from '@/lib/i18n/server';
@@ -55,6 +57,7 @@ export default async function AdminOverviewPage() {
   const residences = adminProperties(6);
   const settings = adminSettings();
   const billing = getBillingStatus();
+  const connection = connectionSummary();
   const provider = activeProviderInfo();
 
   return (
@@ -133,8 +136,8 @@ export default async function AdminOverviewPage() {
           )}
           <p className="mt-5 text-[11.5px] leading-relaxed text-graphite-500">
             {billing.stripeConfigured
-              ? 'A payment provider is connected: this table is a mirror, and the provider remains the source of truth for money.'
-              : 'No payment provider is connected. Changing a membership here writes to our database only — nothing is charged, and no invoice is issued by a processor.'}
+              ? T('A payment provider is connected: this table is a mirror, and the provider remains the source of truth for money.')
+              : T('No payment provider is connected. Changing a membership here writes to our database only — nothing is charged, and no invoice is issued by a processor.')}
           </p>
         </Panel>
 
@@ -167,10 +170,16 @@ export default async function AdminOverviewPage() {
 
           <Notice
             tone={billing.stripeConfigured ? 'ok' : 'attention'}
-            title={billing.stripeConfigured ? 'Billing live · Stripe keys detected' : 'Billing is simulated in this build'}
+            title={billing.stripeConfigured ? T('Billing live · Stripe keys detected') : T('Billing is simulated in this build')}
           >
             {billing.note}
           </Notice>
+
+          <Panel>
+            <PanelHeader label="Facturation" title="Your Stripe account" />
+            <Divider className="my-5" />
+            <BillingConnection connection={connection} billing={billing} />
+          </Panel>
 
           <Panel>
             <PanelHeader label="Config" title="What this deployment is wired to" />

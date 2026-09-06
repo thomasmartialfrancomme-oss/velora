@@ -394,3 +394,17 @@ CREATE TABLE IF NOT EXISTS reservations (
   updated_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_res_user ON reservations(user_id, starts_at);
+
+-- ============================================================
+--  Operator settings, including the Stripe connection made from /admin.
+--
+--  This table holds the account's own wiring, so it is written to disk like
+--  every other table. Anything secret-shaped (a Stripe key) is stored encrypted
+--  with a key derived from AUTH_SECRET — see src/lib/utils/secrets.ts. A database
+--  file copied out of a container still cannot be read without that secret.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);

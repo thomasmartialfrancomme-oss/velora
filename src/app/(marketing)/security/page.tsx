@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { DocumentPage } from '@/components/marketing/document';
 import { env } from '@/lib/config';
+import { billingRuntime } from '@/lib/billing/runtime';
 
 export const metadata: Metadata = {
   title: 'Security & discretion',
@@ -10,7 +11,10 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default function SecurityPage() {
-  const { stripeConfigured, aiProviderConfigured, smtpConfigured } = env.capabilities;
+  const { aiProviderConfigured, smtpConfigured } = env.capabilities;
+  // The billing answer comes from the same resolver the money path uses, so this page
+  // cannot claim there is no key while checkout is talking to Stripe.
+  const stripeConfigured = billingRuntime().configured;
 
   return (
     <DocumentPage

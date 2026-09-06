@@ -65,6 +65,9 @@ export const env = {
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
     /** How a household may pay. Card only until you widen it deliberately. */
     paymentMethods: process.env.VELORA_PAYMENT_METHODS ?? 'card',
+    /** Whether that line was actually set. A pinned `card` must outrank whatever a
+     *  connection stored in the database; an untouched default must not. */
+    paymentMethodsExplicit: Boolean(process.env.VELORA_PAYMENT_METHODS),
     /** Days a payer gets to settle an invoice by transfer before it is overdue. */
     transferDueDays: Math.min(60, Math.max(1, Number(process.env.VELORA_TRANSFER_DUE_DAYS ?? 14))),
     /** Empty means "Stripe's current default for this account" — pinning a stale

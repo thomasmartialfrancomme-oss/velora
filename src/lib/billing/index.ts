@@ -7,7 +7,7 @@
  * `StripeBilling` is wired and complete, and activates the moment a secret key
  * is present in the environment. No key is shipped with this repository.
  */
-import { env } from '@/lib/config';
+import { billingRuntime } from '@/lib/billing/runtime';
 import { stripeRequest } from '@/lib/billing/stripe-api';
 import { canSellMonthly, checkoutMethodOptions, checkoutMethodTypes, methodPolicy, methodsSummary } from '@/lib/billing/methods';
 import { getPlan, type MembershipPlan, type PlanKey } from '@/lib/utils/format';
@@ -55,29 +55,38 @@ export function amountForPlan(plan: MembershipPlan, cycle: 'monthly' | 'annual')
 }
 
 export function getBillingStatus() {
-  const configured = env.capabilities.stripeConfigured;
+  /** One answer for "which key is in force": the environment first, then whatever
+   *  was connected from /admin. UI and money path therefore never disagree. */
+  const runtime = billingRuntime();
+  const configured = runtime.configured;
   const policy = methodPolicy();
-  const secret = env.billing.stripeSecretKey;
   return {
     provider: configured ? ('stripe' as const) : ('demo' as const),
     stripeConfigured: configured,
-    label: configured ? 'Stripe · keys detected' : 'Demo billing · no payment provider connected',
+    label: configured
+      ? `Stripe ${runtime.mode} · ${runtime.account.name || runtime.account.id || 'account connected'}`
+      : 'Demo billing · no payment provider connected',
     /** sk_test_ and sk_live_ are not decoration: a test key can never settle money. */
-    mode: !configured ? 'demo' : secret.startsWith('sk_live_') ? 'live' : secret.startsWith('sk_test_') ? 'test' : 'unknown',
+    mode: runtime.mode,
+    /** Where the working key came from, because "which Stripe is this billing against?"
+     *  is the first question in any support conversation. */
+    source: runtime.source,
+    account: runtime.account,
     note: configured
       ? 'Checkout, the customer portal and the invoice for a transfer all run against Stripe. Webhook handling is at /api/billing/webhook.'
-      : 'Subscriptions are recorded in the platform database. Nothing is charged. Set STRIPE_SECRET_KEY to switch on real billing.',
+      : 'Subscriptions are recorded in the platform database. Nothing is charged. Set STRIPE_SECRET_KEY, or connect an account from /admin → Facturation.',
     methods: policy.enabled.map((method) => ({ id: method.id, label: method.label, recurring: method.recurring, kind: method.kind })),
     methodsSummary: methodsSummary(policy),
     monthlyAvailable: canSellMonthly(policy),
     transferAvailable: policy.oneOff.some((method) => method.kind === 'transfer'),
-    transferDueDays: env.billing.transferDueDays,
-    /** names in VELORA_PAYMENT_METHODS this file does not know — reported, never swallowed */
+    transferDueDays: runtime.transferDueDays,
+    /** names in the configuration this file does not know — reported, never swallowed */
     unknownMethods: policy.unknown,
-    pricesConfigured: Object.values(env.billing.priceIds).filter(Boolean).length,
-    /** A plan with both prices present can be sold from the dashboard-less start. */
+    pricesConfigured: Object.values(runtime.priceIds).filter(Boolean).length,
+    /** A plan with both prices can be sold whether the ids came from the environment
+     *  or from the connection made inside the product. */
     pricesComplete: ['private', 'priority', 'private_office'].every(
-      (key) => Boolean(env.billing.priceIds[`${key}:monthly`] && env.billing.priceIds[`${key}:annual`]),
+      (key) => Boolean(runtime.priceIds[`${key}:monthly`] && runtime.priceIds[`${key}:annual`]),
     ),
   };
 }
@@ -228,8 +237,9 @@ class StripeBilling implements BillingProvider {
   readonly configured = true;
 
   private get key(): string {
-    if (!env.billing.stripeSecretKey) throw new ConstraintError('STRIPE_SECRET_KEY is not set, so no money can move.');
-    return env.billing.stripeSecretKey;
+    const secret = billingRuntime().secretKey;
+    if (!secret) throw new ConstraintError('No Stripe secret key is in force, so no money can move. Set STRIPE_SECRET_KEY or connect an account from /admin → Facturation.');
+    return secret;
   }
 
   /** The customer row every later call hangs off. Created once per member, then remembered. */
@@ -273,7 +283,7 @@ class StripeBilling implements BillingProvider {
    * possible before anybody has touched a dashboard.
    */
   private lineItem(plan: MembershipPlan, cycle: 'monthly' | 'annual') {
-    const priceId = plan.stripe_price_env ? env.billing.priceIds[`${plan.key}:${cycle}`] ?? '' : '';
+    const priceId = plan.stripe_price_env ? billingRuntime().priceIds[`${plan.key}:${cycle}`] ?? '' : '';
     if (priceId) return { price: priceId, quantity: 1 };
     return {
       price_data: {
@@ -337,7 +347,7 @@ class StripeBilling implements BillingProvider {
   async transferInvoice(ctx: BillingContext): Promise<BillingIntent> {
     const policy = methodPolicy();
     if (!policy.enabled.some((method) => method.kind === 'transfer')) {
-      throw new ConstraintError('Bank transfer is not enabled. Add bank_transfer to VELORA_PAYMENT_METHODS and switch it on in the Stripe Dashboard.');
+      throw new ConstraintError('Bank transfer is not enabled. Add bank_transfer to VELORA_PAYMENT_METHODS (or to the rails saved when the account was connected) and switch it on in the Stripe Dashboard.');
     }
     if (ctx.billingCycle !== 'annual') {
       throw new ConstraintError(
@@ -354,7 +364,7 @@ class StripeBilling implements BillingProvider {
         customer,
         items: [this.lineItem(ctx.plan, 'annual')],
         collection_method: 'send_invoice',
-        days_until_due: env.billing.transferDueDays,
+        days_until_due: billingRuntime().transferDueDays,
         payment_behavior: 'default_incomplete',
         payment_settings: {
           save_default_payment_method: 'off',
@@ -395,7 +405,7 @@ class StripeBilling implements BillingProvider {
       url: invoice.hosted_invoice_url ?? '/membership',
       provider: 'stripe',
       simulated: false,
-      message: `Invoice ${invoice.number ?? invoiceId} is open. Stripe shows the account details to transfer from on its own page; your membership switches on when the payment is confirmed, never before. You have ${env.billing.transferDueDays} days.`,
+      message: `Invoice ${invoice.number ?? invoiceId} is open. Stripe shows the account details to transfer from on its own page; your membership switches on when the payment is confirmed, never before. You have ${billingRuntime().transferDueDays} days.`,
     };
   }
 
@@ -422,7 +432,10 @@ export const demoBilling = new DemoBilling();
 export const stripeBilling = new StripeBilling();
 
 export function getBillingProvider(): BillingProvider {
-  return env.capabilities.stripeConfigured ? stripeBilling : demoBilling;
+  // Not `env.capabilities`: a connection made from /admin is not visible in the
+  // environment, and silently staying on the demo provider there is exactly the bug
+  // an operator would report as « j'ai connecté Stripe mais rien n'est payé ».
+  return billingRuntime().configured ? stripeBilling : demoBilling;
 }
 
 /* ------------------------------------------------------------- actions */
@@ -443,7 +456,7 @@ export async function cancelSubscription(actor: Actor, atPeriodEnd = true): Prom
     };
   }
 
-  if (subscription.provider === 'stripe' && subscription.provider_subscription_id && env.capabilities.stripeConfigured) {
+  if (subscription.provider === 'stripe' && subscription.provider_subscription_id && billingRuntime().configured) {
     // Real cancellation at the provider, then mirrored locally.
     await new StripeBilling().cancelNow(subscription.provider_subscription_id);
   }

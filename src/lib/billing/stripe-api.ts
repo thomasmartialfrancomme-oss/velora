@@ -17,7 +17,7 @@
  *
  * Nothing here logs a secret: the key is read per call and never returned.
  */
-import { env } from '@/lib/config';
+import { billingRuntime } from '@/lib/billing/runtime';
 
 export class StripeError extends Error {
   constructor(
@@ -73,11 +73,16 @@ export interface StripeRequestOptions {
 
 /** One call to api.stripe.com (or to STRIPE_API_BASE, which is how the test suite proves this file). */
 export async function stripeRequest<T = Record<string, unknown>>(path: string, options: StripeRequestOptions = {}): Promise<T> {
-  const secret = options.secret ?? env.billing.stripeSecretKey;
+  const runtime = billingRuntime();
+  const secret = options.secret ?? runtime.secretKey;
   if (!secret) throw new StripeError(500, 'no_secret', 'STRIPE_SECRET_KEY is not set, so no money can move.');
 
-  const base = (env.billing.apiBase || 'https://api.stripe.com').replace(/\/$/, '');
-  const method = options.method ?? (path.includes('?') ? 'GET' : 'POST');
+  const base = (runtime.apiBase || 'https://api.stripe.com').replace(/\/$/, '');
+  // A call with no body is a read, whether or not the path itself carries a query:
+  // `GET /v1/account`, `GET /v1/prices/lookup?lookup_key=…` and the list endpoints all
+  // arrive here with `query` only. Inferring the verb from the path string alone turned
+  // those into POSTs, which Stripe refuses — caught by the harness, not by a type.
+  const method = options.method ?? (options.query || path.includes('?') || !Object.keys(options.params ?? {}).length ? 'GET' : 'POST');
   const url = new URL(`${base}${path}`);
   for (const [key, value] of Object.entries(options.query ?? {})) {
     if (value !== undefined && value !== '') url.searchParams.set(key, String(value));
@@ -88,7 +93,7 @@ export async function stripeRequest<T = Record<string, unknown>>(path: string, o
     Accept: 'application/json',
     'User-Agent': 'velora-private/1.0 (billing)',
   };
-  if (env.billing.apiVersion) headers['Stripe-Version'] = env.billing.apiVersion;
+  if (runtime.apiVersion) headers['Stripe-Version'] = runtime.apiVersion;
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
 
   const body = method === 'GET' || method === 'DELETE' ? undefined : encodeStripeForm(options.params ?? {});
@@ -146,7 +151,7 @@ export async function verifyStripeSignature(input: {
   toleranceSeconds?: number;
   now?: number;
 }): Promise<SignatureCheck> {
-  const secret = (input.secret ?? env.billing.stripeWebhookSecret).replace(/^whsec_/, '');
+  const secret = (input.secret ?? billingRuntime().webhookSecret).replace(/^whsec_/, '');
   if (!secret) return { ok: false, reason: 'no_secret' };
   if (!input.header) return { ok: false, reason: 'missing_header' };
 

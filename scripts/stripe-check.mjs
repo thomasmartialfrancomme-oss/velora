@@ -30,6 +30,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const APP_PORT = Number(process.env.VELORA_CHECK_PORT ?? 3100);
 const MOCK_PORT = Number(process.env.STRIPE_MOCK_PORT ?? 4571);
 const DB_PATH = process.env.VELORA_CHECK_DB ?? path.join(ROOT, 'data', 'stripe-check.db');
+/** Seconde instance, sans aucune clé Stripe dans l'environnement : c'est le cas
+ *  « j'ai déjà un compte, je veux juste le connecter ». */
+const APP2_PORT = APP_PORT + 1;
+const BASE2 = `http://127.0.0.1:${APP2_PORT}`;
+const CONNECT_DB_PATH = path.join(ROOT, 'data', 'stripe-connect-check.db');
 const SECRET = 'sk_test_velora_local_check';
 const WEBHOOK_SECRET = 'whsec_velora_local_check';
 const BASE = `http://127.0.0.1:${APP_PORT}`;
@@ -42,7 +47,11 @@ process.on('uncaughtException', (error) => {
 });
 
 const REQUESTS = []; // everything the application asked Stripe to do
-const MOCK = { customerSeq: 0, sessionSeq: 0, subSeq: 0, invoiceSeq: 0 };
+const MOCK = {
+  customerSeq: 0, sessionSeq: 0, subSeq: 0, invoiceSeq: 0,
+  /** ce que « connecter mon compte » doit pouvoir retrouver au deuxième essai */
+  prices: new Map(), products: new Map(), portal: new Map(), endpoints: [],
+};
 
 /* ------------------------------------------------------------ the mock */
 
@@ -134,17 +143,74 @@ const mock = http.createServer((request, response) => {
       return reply(response, 200, { id, object: 'invoice', number: 'VP-2026-0001', status: 'open', hosted_invoice_url: `${BASE}/stripe-mock-invoice/${id}` });
     }
     if (request.method === 'DELETE' && /^\/v1\/subscriptions\//.test(url.pathname)) {
-      return reply(response, 200, { id: url.pathname.split('/')[2], object: 'subscription', status: 'canceled' });
+      return reply(response, 200, { id: url.pathname.split('/')[3], object: 'subscription', status: 'canceled' });
     }
     if (request.method === 'POST' && url.pathname === '/v1/billing_portal/sessions') {
       return reply(response, 200, { id: 'bps_check_1', url: `${BASE}/stripe-mock-portal` });
     }
-    // The setup script's calls, so `--base` can point at this file too.
-    if (request.method === 'POST' && url.pathname === '/v1/products') return reply(response, 200, { id: `prod_check_${REQUESTS.length}` });
-    if (request.method === 'POST' && url.pathname === '/v1/prices') return reply(response, 200, { id: `price_check_${REQUESTS.length}` });
-    if (request.method === 'POST' && url.pathname === '/v1/billing_portal/configurations') return reply(response, 200, { id: 'bpc_check_1' });
+    // The setup script's calls, so `--base` can point at this file too — and the
+    // connect-your-own-account flow, which must be re-runnable: a price created on
+    // the first attempt is *found* by lookup key on the second, never duplicated.
+    if (request.method === 'POST' && url.pathname === '/v1/products') {
+      const name = String(params.name ?? '');
+      let id = MOCK.products.get(name);
+      if (!id) { id = `prod_check_${MOCK.products.size + 1}`; MOCK.products.set(name, id); }
+      return reply(response, 200, { id, object: 'product', name });
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/prices') {
+      const lookup = String(params.lookup_key ?? '');
+      let id = MOCK.prices.get(lookup);
+      if (!id) { id = `price_check_${MOCK.prices.size + 1}`; if (lookup) MOCK.prices.set(lookup, id); }
+      return reply(response, 200, { id, object: 'price', currency: params.currency, unit_amount: Number(params.unit_amount), recurring: { interval: params.recurring?.interval } });
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/billing_portal/configurations') {
+      const name = String(params.name ?? '');
+      let id = MOCK.portal.get(name);
+      if (!id) { id = `bpc_check_${MOCK.portal.size + 1}`; MOCK.portal.set(name, id); }
+      return reply(response, 200, { id, object: 'billing_portal.configuration', name });
+    }
     if (request.method === 'POST' && url.pathname === '/v1/webhook_endpoints') {
-      return reply(response, 200, { id: 'we_check_1', secret: `${WEBHOOK_SECRET}_rotated` });
+      const id = `we_check_${MOCK.endpoints.length + 1}`;
+      // un secret n'est montré qu'à la création : c'est ce qui rend le câblage
+      // possible en une fois, et ce qui oblige à le dire quand il existe déjà.
+      const secret = `whsec_created_${MOCK.endpoints.length + 1}`;
+      MOCK.endpoints.push({ id, url: String(params.url ?? ''), status: 'enabled', events: params.enabled_events ?? [] });
+      return reply(response, 200, { id, object: 'webhook_endpoint', url: params.url, secret, enabled_events: params.enabled_events });
+    }
+
+    /* ── ce que la lecture d'un compte existant renvoie ── */
+    if (request.method === 'GET' && url.pathname === '/v1/account') {
+      return reply(response, 200, {
+        id: 'acct_check_1', object: 'account', country: 'FR',
+        charges_enabled: true, details_submitted: true,
+        business_profile: { name: 'Velora Test SARL' },
+        capabilities: {
+          card: { status: 'active' },
+          sepa_debit_payments: { status: 'active' },
+          bank_transfers: { status: 'inactive' },
+          ideal_payments: { status: 'pending' },
+        },
+      });
+    }
+    if (request.method === 'GET' && url.pathname === '/v1/prices/lookup') {
+      const id = MOCK.prices.get(url.searchParams.get('lookup_key'));
+      if (!id) return reply(response, 404, { error: { type: 'invalid_request_error', code: 'resource_missing', message: 'No price found for that lookup key.' } });
+      return reply(response, 200, { id, object: 'price' });
+    }
+    if (request.method === 'GET' && url.pathname === '/v1/products') {
+      return reply(response, 200, { object: 'list', data: [...MOCK.products].map(([name, id]) => ({ id, name })) });
+    }
+    if (request.method === 'GET' && url.pathname === '/v1/billing_portal/configurations') {
+      return reply(response, 200, { object: 'list', data: [...MOCK.portal].map(([name, id]) => ({ id, name })) });
+    }
+    if (request.method === 'GET' && url.pathname === '/v1/webhook_endpoints') {
+      return reply(response, 200, { object: 'list', data: MOCK.endpoints.map(({ id, url: endpointUrl, status }) => ({ id, url: endpointUrl, status })) });
+    }
+    if (request.method === 'DELETE' && /^\/v1\/webhook_endpoints\//.test(url.pathname)) {
+      const id = url.pathname.split('/')[3];
+      const had = MOCK.endpoints.some((endpoint) => endpoint.id === id);
+      MOCK.endpoints = MOCK.endpoints.filter((endpoint) => endpoint.id !== id);
+      return reply(response, 200, { id, object: 'webhook_endpoint', deleted: had });
     }
     return reply(response, 404, { error: { type: 'invalid_request_error', message: `The check harness does not stub ${request.method} ${url.pathname}.` } });
   });
@@ -195,15 +261,30 @@ async function call(urlPath, init = {}) {
   return { status: response.status, json: await response.json().catch(() => ({})), text: () => Promise.resolve('') };
 }
 
+const connectJar = new Map();
+async function call2(urlPath, init = {}) {
+  const headers = { ...(init.headers ?? {}) };
+  if (connectJar.size) headers.cookie = [...connectJar].map(([k, v]) => `${k}=${v}`).join('; ');
+  const response = await fetch(new URL(urlPath, BASE2), { ...init, headers, redirect: 'manual' });
+  for (const raw of response.headers.getSetCookie?.() ?? []) {
+    const [pair] = raw.split(';');
+    const at = pair.indexOf('=');
+    if (at > 0) connectJar.set(pair.slice(0, at).trim(), pair.slice(at + 1));
+  }
+  return { status: response.status, json: await response.json().catch(() => ({})) };
+}
+
 const db = () => new Database(DB_PATH);
+const connectDb = () => new Database(CONNECT_DB_PATH);
 const subscriptionOf = (userId) => db().prepare(`SELECT * FROM subscriptions WHERE user_id = ?`).get(userId);
 const openInvoice = (userId) => db().prepare(`SELECT * FROM invoices WHERE user_id = ? ORDER BY issued_at DESC LIMIT 1`).get(userId);
 
 let app = null;
+let app2 = null; // la seconde instance, celle qui n'a aucune clé dans son environnement
 try {
   // Un serveur orphelin sur l'un de ces ports ferait ressembler la course à un
   // succès (ou à un échec) qui n'est pas le sien : on le refuse avant de commencer.
-  for (const port of [APP_PORT, MOCK_PORT]) {
+  for (const port of [APP_PORT, APP2_PORT, MOCK_PORT]) {
     try {
       const probe = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(900) });
       console.error(`port ${port} déjà occupé (réponse ${probe.status}) — tuez le processus ou changez VELORA_CHECK_PORT.`);
@@ -373,19 +454,139 @@ try {
   });
   check('un corps non signé est rejeté', unsigned.status === 400, `reçu ${unsigned.status}`);
 
+
+  /* ══════════ connecter son propre compte Stripe depuis /admin ══════════
+     Aucune clé dans l'environnement de cette instance : tout doit venir du corps
+     de la requête, et se retrouver ensuite chiffré dans la base. */
+  for (const suffix of ['', '-wal', '-shm']) fs.rmSync(`${CONNECT_DB_PATH}${suffix}`, { force: true });
+  app2 = spawn('npx', ['next', 'start', '-p', String(APP2_PORT), '-H', '127.0.0.1'], {
+    cwd: ROOT,
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      AUTH_SECRET: crypto.randomBytes(32).toString('base64'),
+      VELORA_DB_PATH: CONNECT_DB_PATH,
+      VELORA_SEED_DEMO: '1',
+      STRIPE_API_BASE: `http://127.0.0.1:${MOCK_PORT}`,
+      NEXT_PUBLIC_APP_URL: BASE2,
+    },
+  });
+  let log2 = '';
+  app2.stdout?.on('data', (chunk) => (log2 += chunk));
+  app2.stderr?.on('data', (chunk) => (log2 += chunk));
+  let connectedTo = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      const probe = await fetch(`${BASE2}/api/health`, { signal: AbortSignal.timeout(1500) });
+      if (probe.ok) { connectedTo = await probe.json(); break; }
+    } catch { /* pas encore en ligne */ }
+    await new Promise((r) => setTimeout(r, 750));
+  }
+  check('sans clé en environnement, l’instance démarre en démo', connectedTo?.integrations?.billing?.provider === 'demo', JSON.stringify(connectedTo?.integrations?.billing?.provider));
+
+  const adminLogin = await call2('/api/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: BASE2 },
+    body: JSON.stringify({ email: 'admin@velora.private', password: 'VeloraAdmin2026!' }),
+  });
+  check('un administrateur ouvre la console de cette instance', adminLogin.status === 200, JSON.stringify(adminLogin.json).slice(0, 120));
+
+  const refused = await call2('/api/admin/billing-connection', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: BASE2 },
+    body: JSON.stringify({ secretKey: 'pk_live_not_a_secret_key' }),
+  });
+  check('une clé qui n’est pas une clé secrète est refusée au portillon', refused.status >= 400 && /sk_test_|sk_live_|look like/i.test(JSON.stringify(refused.json)), JSON.stringify(refused.json).slice(0, 150));
+
+  const connect = await call2('/api/admin/billing-connection', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: BASE2 },
+    body: JSON.stringify({ secretKey: SECRET }),
+  });
+  const outcome = connect.json?.data?.outcome;
+  check('la connexion part du compte lu chez Stripe', connect.status === 200 && outcome?.accountId === 'acct_check_1', JSON.stringify(connect.json).slice(0, 180));
+  check('le nom du compte revient pour l’affichage', outcome?.accountName === 'Velora Test SARL', JSON.stringify(outcome?.accountName));
+  check('les six prix du catalogue sont créés', MOCK.prices.size === 6 && outcome?.pricesCreated === 6, JSON.stringify({ size: MOCK.prices.size, created: outcome?.pricesCreated }));
+  const priceAmounts = REQUESTS.filter((entry) => entry.path === '/v1/prices').map((entry) => String(entry.params?.unit_amount));
+  check('aux montants exacts du catalogue', JSON.stringify(priceAmounts.slice(-6)) === JSON.stringify(['19900', '214920', '49900', '526944', '150000', '1800000']), JSON.stringify(priceAmounts.slice(-6)));
+  const webhookCall = [...REQUESTS].reverse().find((entry) => entry.path === '/v1/webhook_endpoints' && entry.method === 'POST');
+  check('le webhook est créé sur la bonne URL avec sept événements', String(webhookCall?.params?.url) === `${BASE2}/api/billing/webhook` && (webhookCall?.params?.enabled_events ?? []).length === 7, JSON.stringify(webhookCall?.params?.enabled_events));
+  check('chaque écriture porte une clé d’idempotence', [...REQUESTS].filter((entry) => entry.method === 'POST' && /^\/v1\/(prices|products|webhook_endpoints|billing_portal\/configurations)$/.test(entry.path)).every((entry) => entry.headers['idempotency-key']), 'écritures sans en-tête Idempotency-Key');
+  check('le portail client est créé', Boolean(outcome?.portalCreated), JSON.stringify(outcome?.portalConfigurationId ?? outcome?.portalCreated));
+
+  const afterConnect = await (await fetch(`${BASE2}/api/health`)).json();
+  const live = afterConnect.integrations.billing;
+  check('l’application facture désormais chez Stripe', live.provider === 'stripe' && live.mode === 'test' && live.source === 'admin', JSON.stringify({ p: live.provider, m: live.mode, s: live.source }));
+  check('les rails suivent ce que le compte a obtenu', /Card/.test(live.methodsSummary) && /SEPA/.test(live.methodsSummary) && !/ransfer/.test(live.methodsSummary), live.methodsSummary);
+  check('le virement est retiré de la vente, pas cassé', live.transferAvailable === false && live.monthlyAvailable === true, JSON.stringify({ t: live.transferAvailable, m: live.monthlyAvailable }));
+  check('les prix stockés rendent les trois plans vendables', live.pricesComplete === true && live.pricesConfigured === 6, JSON.stringify({ c: live.pricesConfigured, ok: live.pricesComplete }));
+
+  const leaked = JSON.stringify(connect.json ?? {});
+  check('aucune réponse HTTP ne renvoie la clé', !leaked.includes(SECRET) && leaked.includes('…'), leaked.slice(0, 120));
+  const stored = connectDb().prepare(`SELECT value FROM settings WHERE key = 'billing.stripe_secret_key'`).get();
+  check('la clé stockée est chiffrée, pas en clair', String(stored?.value).startsWith('enc:v1.') && !String(stored?.value).includes(SECRET), String(stored?.value).slice(0, 24));
+
+  // le secret de signature appris à la création du endpoint est celui qui vérifie désormais
+  // le secret que le mock a montré à la création du endpoint — et à ce moment seulement
+  const bornSecret = 'whsec_created_1';
+  const pingRaw = JSON.stringify({ id: `evt_${crypto.randomBytes(4).toString('hex')}`, type: 'ping', data: { object: {} } });
+  const accepted = await fetch(`${BASE2}/api/billing/webhook`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: BASE2, 'stripe-signature': sign(pingRaw, bornSecret) },
+    body: pingRaw,
+  });
+  const staleSecret = await fetch(`${BASE2}/api/billing/webhook`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: BASE2, 'stripe-signature': sign(pingRaw, WEBHOOK_SECRET) },
+    body: pingRaw,
+  });
+  check('l’événement signé avec le secret reçu à la création est accepté', accepted.status === 200, `reçu ${accepted.status}`);
+  check('l’ancienne clé de signature ne fait plus confiance', staleSecret.status === 400, `reçu ${staleSecret.status}`);
+
+  // re-brancher le même compte : rien ne doit être créé deux fois
+  const again = await call2('/api/admin/billing-connection', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', origin: BASE2 },
+    body: JSON.stringify({ secretKey: SECRET }),
+  });
+  const againOutcome = again.json?.data?.outcome;
+  check('reconnecter le même compte ne duplique aucun prix', againOutcome?.pricesCreated === 0 && againOutcome?.pricesReused === 6, JSON.stringify({ created: againOutcome?.pricesCreated, reused: againOutcome?.pricesReused }));
+  check('et que le portail existant est réutilisé', againOutcome?.portalCreated === false, JSON.stringify(againOutcome?.portalCreated));
+  check('un second endpoint webhook n’est pas créé pour rien', MOCK.endpoints.length === 1 && againOutcome?.webhookCreated === false, JSON.stringify({ endpoints: MOCK.endpoints.map((e) => e.id), created: againOutcome?.webhookCreated }));
+
+  const off = await call2('/api/admin/billing-connection', {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json', origin: BASE2 },
+    body: JSON.stringify({ confirm: 'DISCONNECT' }),
+  });
+  const afterDisconnect = await (await fetch(`${BASE2}/api/health`)).json();
+  check('déconnecter efface la configuration', off.status === 200 && afterDisconnect.integrations.billing.provider === 'demo', JSON.stringify(off.json?.data?.removed ?? off.json).slice(0, 140));
+  check('et supprime l’endpoint chez Stripe', MOCK.endpoints.length === 0, JSON.stringify({ restants: MOCK.endpoints.map((e) => e.id), note: off.json?.data?.note, supprime: off.json?.data?.webhookRemoved }));
+  const afterRows = connectDb().prepare(`SELECT COUNT(*) AS n FROM settings WHERE key LIKE 'billing.%'`).get();
+  check('plus aucune ligne de connexion ne reste en base', Number(afterRows?.n) === 0, String(afterRows?.n));
+
   console.log(`\n${passed}/${passed + failures.length} checks passed`);
-  if (log && failures.length) console.log('\n— sortie du serveur —\n' + log.split('\n').slice(-12).join('\n'));
+  if (failures.length) {
+    if (log) console.log('\n— sortie du serveur (instance à clé d’environnement) —\n' + log.split('\n').filter((line) => line.trim()).slice(-12).join('\n'));
+    if (log2) console.log('\n— sortie du serveur (instance connectée depuis /admin) —\n' + log2.split('\n').filter((line) => line.trim()).slice(-12).join('\n'));
+  }
 } catch (error) {
   console.error('le contrôle a échoué :', error);
   failures.push(String(error?.message ?? error));
 } finally {
-  // `npx` enfante `next start` : sans tuer le groupe, un orphelin garde le port et
-  // la base, et la course suivante mesure un processus mort au lieu du vôtre.
-  if (app?.pid) {
-    try { process.kill(-app.pid, 'SIGKILL'); } catch { app.kill('SIGKILL'); }
+  for (const process_ of [app, app2].filter(Boolean)) {
+    // `npx` enfante `next start` : sans tuer le groupe, un orphelin garde le port et
+    // la base, et la course suivante mesure un processus mort au lieu du vôtre.
+    if (process_?.pid) {
+      try { process.kill(-process_.pid, 'SIGKILL'); } catch { process_.kill('SIGKILL'); }
+    }
   }
   mock.close();
-  for (const suffix of ['', '-wal', '-shm']) fs.rmSync(`${DB_PATH}${suffix}`, { force: true });
+  for (const file of [DB_PATH, CONNECT_DB_PATH]) {
+    for (const suffix of ['', '-wal', '-shm']) fs.rmSync(`${file}${suffix}`, { force: true });
+  }
 }
 
 process.exit(failures.length ? 1 : 0);
