@@ -130,6 +130,8 @@ Never: passwords or hashes, session material, cookies, document contents, IP add
 | No field-level encryption of document contents | An attacker with disk access reads files | Encrypt at rest (volume) or per-object keys with KMS |
 | Not penetration tested; no DPIA, DPA or SOC 2 artefacts | Regulatory and contractual review remains open | Third-party test before onboarding a principal; document the data flow above for the DPIA |
 
+**Demonstration data is never written to a production database by accident.** `getDb()` applies the schema on first open and seeds the published demo households only when `VELORA_SEED_DEMO` asks for it (development seeds by default, production does not) — a host that is reachable from the internet starts empty and knows nothing about anyone. Registration still bootstraps each new member with their own starter residence, categories and opening task, so "no demo data" does not mean "no usable product".
+
 ## 13. Operator checklist before going live
 
 1. `AUTH_SECRET` set (32+ chars, from a secret manager, rotated on suspicion). The process refuses to start without it — the check runs in `src/instrumentation.ts`, so an empty secret is a boot failure, not a quiet downgrade.

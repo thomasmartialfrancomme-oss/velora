@@ -52,6 +52,25 @@ function wrap(raw: BetterSqlite3.Database, dbPath: string): DatabaseHandle {
 }
 
 /** Open (and, if needed, migrate + seed) the database. Safe to call anywhere server-side. */
+/**
+ * Whether the demonstration households may be written into an empty database.
+ *
+ * The seeded passphrases are published in README.md, so on a host reachable from
+ * the internet auto-seeding them would be handing out the front door: production
+ * needs an explicit `VELORA_SEED_DEMO=1` (the same flag
+ * `scripts/prepare-runtime.mjs` honours). Development keeps the convenience —
+ * `npm run dev` against an empty file still opens on a populated household.
+ *
+ * This cannot leave a real deployment with an empty ledger: every account created
+ * through /api/auth/register receives its own starter residence, expense
+ * categories and opening task (seedStarterData, src/lib/auth/session.ts).
+ */
+function demoSeedAllowed(): boolean {
+  const flag = String(process.env.VELORA_SEED_DEMO ?? '').toLowerCase();
+  const requested = flag === '1' || flag === 'true' || flag === 'yes';
+  return process.env.NODE_ENV !== 'production' || requested;
+}
+
 export function getDb(): DatabaseHandle {
   if (handle) return handle;
 
@@ -66,15 +85,13 @@ export function getDb(): DatabaseHandle {
   applySchema(raw as any, process.cwd());
 
   const users = (raw.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n;
-  if (users === 0) {
+  if (users === 0 && demoSeedAllowed()) {
     const bcrypt = require('bcryptjs');
     const rounds = Number(process.env.BCRYPT_ROUNDS ?? 12);
     const result = seed(raw as any, { hash: (plain: string) => bcrypt.hashSync(plain, rounds) });
-    if (process.env.NODE_ENV !== 'production') {
-      console.info(
-        `[velora] seeded demonstration dataset → ${result.seeded ? 'ok' : 'skipped'} · ${dbPath}`,
-      );
-    }
+    console.info(`[velora] seeded demonstration dataset → ${result.seeded ? 'ok' : 'skipped'} · ${dbPath}`);
+  } else if (users === 0) {
+    console.info('[velora] empty database, demonstration data not seeded (production without VELORA_SEED_DEMO=1)');
   }
 
   handle = wrap(raw, dbPath);
