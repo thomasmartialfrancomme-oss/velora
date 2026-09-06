@@ -263,6 +263,8 @@ git push -u origin main
 
 ### Deliberate choices worth knowing about
 
+- `npm run dev` and `npm run build` share `.next`. If a page returns 500 with `Cannot read properties of undefined (reading 'call')` in `webpack-runtime.js` right after a build, that is the stale dev cache, not the code: stop the dev server and remove `.next`. Verified this way — the same landing page served 200 before the build and 500 after, then 200 again after the cache was cleared.
+
 * **No UI kit, no chart library.** The tables, panels, tabs and forms are eleven small components in `src/components/ui`, so nothing arrives with a default blue.
 * **Colour is restricted on purpose:** deep black, ivory, graphite, and a metallic gold used for emphasis only — one hairline, one figure, never a filled button.
 * **Type.** Cormorant Garamond for titles (uppercase, tracked), Manrope for the interface. Both self-hosted.
