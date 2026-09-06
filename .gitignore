@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────
+# VELORA PRIVATE — what must never reach the repository:
+# dependencies, build output, and anything that carries real
+# client data or real keys (the whole data/ tree is runtime state).
+# ─────────────────────────────────────────────────────────────
+
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+.npm/
+.yarn/
+
+# build output & caches
+.next/
+out/
+build/
+dist/
+.swc/
+coverage/
+.turbo/
+.cache/
+next-env.d.ts
+*.tsbuildinfo
+
+# runtime state — database, uploaded documents, generated secret
+# Ignored wholesale, with the two .gitkeep files kept so the
+# directory structure survives a fresh clone.
+data/*
+!data/.gitkeep
+!data/uploads/
+data/uploads/*
+!data/uploads/.gitkeep
+
+# local configuration and every secret-shaped file
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.id_rsa
+*.crt
+secrets/
+
+# logs
+*.log
+npm-debug.log*
+yarn-error.log*
+.dev.log
+.install.log
+logs/
+
+# editors / operating system
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# scratch
+tmp/
+scratch/

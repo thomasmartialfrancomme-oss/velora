@@ -1,0 +1,31 @@
+# ─────────────────────────────────────────────────────────────
+# Deterministic line endings: the repository stores LF, always.
+# Without this, a Windows contributor turns every file into CRLF
+# and the next diff is unreadable.
+# ─────────────────────────────────────────────────────────────
+* text=auto eol=lf
+
+# shell / node must stay LF whatever the platform, or they break
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
+
+# documents and images
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.heic   binary
+*.ico    binary
+*.pdf    binary
+*.docx   binary
+*.xlsx   binary
+*.pptx   binary
+*.db     binary
+*.sqlite binary
+*.gz     binary
+*.zip    binary
+*.svg    text
+
+# generated / not worth reviewing line by line
+package-lock.json linguist-generated=true

@@ -1,0 +1,47 @@
+{
+  "name": "velora-private",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VELORA PRIVATE \u2014 AI Private Estate & Lifestyle Manager",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:status": "node --no-warnings scripts/db-cli.mjs status",
+    "db:seed": "node --no-warnings scripts/db-cli.mjs seed",
+    "db:reset": "node --no-warnings scripts/db-cli.mjs reset --yes",
+    "db:verify": "node --no-warnings scripts/db-cli.mjs verify",
+    "db:users": "node --no-warnings scripts/db-cli.mjs users",
+    "db:sql": "node --no-warnings scripts/db-cli.mjs sql",
+    "check": "npm run typecheck && npm run db:verify",
+    "smoke": "node --no-warnings scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "2.4.3",
+    "better-sqlite3": "11.10.0",
+    "clsx": "2.1.1",
+    "framer-motion": "11.18.2",
+    "jose": "5.9.6",
+    "lucide-react": "0.469.0",
+    "next": "14.2.33",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "20.19.9",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.6.3"
+  },
+  "engines": {
+    "node": ">=18.18"
+  }
+}
