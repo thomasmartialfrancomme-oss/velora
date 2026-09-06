@@ -186,6 +186,18 @@ prefixe fait tomber la suite de 76 a 68.
   n'a pas encore encaissé un seul euro est un bouton qui ment). Quand le premier client important
   paiera par virement, on ajoutera l'écran `Refund` branché sur l'API — une demi-journée.
 
+
+Deux limites sont volontairement laisses ouvertes, pour ne pas fabriquer un etat faux :
+
+- **entre le clic et le webhook, lecran garde letat precedent.** Ouvrir une session Checkout
+  njoute pas dabonnement « en attente » : un panier abandonne laisserait alors un membre bloque
+  sur un etat pending que rien ne nettoyage — Stripe na pas ete ecoute pour `checkout.session.expired`,
+  et lajouter pour effacer une ligne ne vaut pas le risque dun faux negatif. Le plan affiche
+  change au moment ou Stripe confirme, en general en quelques secondes.
+- **changer un role deconnecte la personne concernee.** Le role voyage dans le jeton de session ;
+  la promotion dun membre vers la console revoque donc ses sessions (comme la suspension le faisait
+  deja) et la reponse porte `requiresRelogin`. Sans cela, la personne promue reste sur un jeton qui
+  dit lancien role et croit, a juste titre, que la console lignore.
 ## 7. Sans clé, que se passe-t-il ?
 
 Le produit tourne : l'adhésion s'enregistre dans la base locale, l'écran annonce « aucune clé de

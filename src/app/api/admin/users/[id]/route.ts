@@ -22,6 +22,11 @@ export const PATCH = api({
     const patch = body as { role?: 'owner' | 'admin'; status?: 'active' | 'suspended' | 'invited' };
     if (patch.role) {
       setUserRole(params.id, patch.role);
+      // The role travels inside the session token, so a promotion is invisible to the person it
+      // was applied to until they sign in again — they would reasonably read that as the console
+      // ignoring them. Revoking on a role change makes them sign back in, the same way a status
+      // change below already does, and says so in the response.
+      getDb().run(`UPDATE users SET sessions_revoked_at = @ts WHERE id = @id`, { ts: new Date().toISOString(), id: params.id });
       audit({ userId: user.id, event: 'admin.user_role_changed', target: params.id, meta: { role: patch.role } });
     }
     if (patch.status) {
@@ -34,6 +39,7 @@ export const PATCH = api({
     return {
       updated: true,
       user: getDb().get(`SELECT id, email, role, status, sessions_revoked_at AS revokedAt FROM users WHERE id = @id`, { id: params.id }),
+      requiresRelogin: Boolean(patch.role),
     };
   },
 });
