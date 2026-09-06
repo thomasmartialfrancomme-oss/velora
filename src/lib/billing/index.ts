@@ -304,6 +304,7 @@ class StripeBilling implements BillingProvider {
         'The monthly plan renews by itself, and none of the enabled payment methods can be re-charged. Choose the annual plan, or enable card or a direct debit.',
       );
     }
+    const offered = policy.enabled.filter((method) => method.recurring && method.kind !== 'transfer');
     const types = checkoutMethodTypes(policy);
     const options = checkoutMethodOptions(policy);
 
@@ -368,7 +369,9 @@ class StripeBilling implements BillingProvider {
       url: session.url,
       provider: 'stripe',
       simulated: false,
-      message: `Opening Stripe Checkout. You can pay by ${methodsSummary(policy)}.`,
+      // Les options annoncées sont celles de la page, pas celles du compte : un rail que Stripe
+      // refuse sur un abonnement (BLIK, virement) ne doit pas être promis au membre.
+      message: `Opening Stripe Checkout. ${offered.length ? `You can pay by ${offered.map((m) => m.label).join(', ')}.` : 'Stripe will show the payment options your account allows.'}`,
     };
   }
 
