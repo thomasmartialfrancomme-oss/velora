@@ -47,6 +47,27 @@ dans le navigateur ; les routes sensibles exigent l'en-tête `Origin`.
 | Courriel (invitations, notes du matin) | `VELORA_SMTP_*` | journalisé dans la sortie du serveur |
 | Cartes (fonds cartographiques) | `NEXT_PUBLIC_MAPBOX_TOKEN` | planches de coordonnées, sans tuiles |
 
+### 5 bis. Le compte administrateur de démonstration, sur le site public
+
+`VELORA_SEED_DEMO=1` crée trois ménages fictifs **dont les passphrases sont publiés dans ce
+README**. Sur un site joignable d'Internet, cela revient à laisser la clé sous le paillasson :
+le compte `admin@velora.private` a donc été **pivoté le 6 septembre 2026** (nouvelle passphrase
+communiquée hors dépôt ; l'ancienne répond 401). Les deux comptes `owner` de démonstration sont
+restés actifs — ils ne voient que leurs propres données fictives, mais basculez-les aussi si le
+site devient une vitrine publique permanente.
+
+**Ce pivot ne survit pas à un redéploiement** : le disque de l'offre gratuite Render est
+éphémère, donc la base se re-crée avec les passphrases publiés. Pour fermer durablement le
+rendez-vous, une seule action :
+
+- Render → service → Environment → **supprimer `VELORA_SEED_DEMO`** (ou le passer à `0`), puis
+  Redeploy. Le site démarre alors sur une base vide ; le premier compte créé via
+  `/api/auth/register` devient `owner`, et c'est ce compte qu'il faut promouvoir `admin` depuis
+  un second compte owner (la console refuse de modifier son propre rôle).
+
+`npm run db:reset` fait la même chose en local (détruit et recrée `data/velora.db`) — à ne
+lancer que sur un déploiement qui n'a pas encore de vrais membres.
+
 ## 5. En ligne (Render) — configuration déjà dans le dépôt
 
 1. Dépot GitHub → Render → **Blueprint** : `render.yaml` est lu tel quel — région `frankfurt`,
